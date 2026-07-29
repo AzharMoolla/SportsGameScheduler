@@ -1,8 +1,11 @@
 name: Live Data Monitor
 
+# MOTHBALLED (2026-07): the every-30-minutes schedule is disabled so nothing runs (or bills)
+# while the project is parked. It can still be run by hand from the Actions tab.
+# TO RE-ENABLE: uncomment the `schedule:` block below.
 on:
-  schedule:
-    - cron: '7,37 * * * *'
+  # schedule:
+  #   - cron: '7,37 * * * *'
   workflow_dispatch:
 
 jobs:

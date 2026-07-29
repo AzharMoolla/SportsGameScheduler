@@ -1,10 +1,14 @@
 name: CI
 
+# MOTHBALLED (2026-07): push/PR triggers disabled so no Actions minutes are consumed while the
+# project is parked. Run manually from the Actions tab if you need a build check.
+# TO RE-ENABLE: uncomment the `push:` and `pull_request:` blocks below.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
