@@ -94,11 +94,18 @@ These live in Supabase → Settings → Edge Functions → Secrets (they are *no
 **Nothing here needs cancelling.** Confirmed 2026-07-29: every data provider was on a free/keyed
 tier, so parking the project costs nothing and restarting it doesn't require re-purchasing anything.
 
-- **All data providers — free tier, nothing to cancel.** PandaScore (esports), API-Sports /
-  API-Football, TheSportsDB, OpenF1. Their API keys died with the Supabase project's secrets, so on
-  restart you just re-issue keys from the same free accounts.
+- **All data providers — free tier, nothing to cancel.** Verified against the code:
+  API-Sports/API-Football (the hydrator is explicitly written against "the free API-Sports plan"),
+  TheSportsDB (free v1 endpoints), PandaScore, plus OpenF1, Cricsheet, TFRRS, World Athletics and
+  the World Cup JSON feed — which need no key at all. Their keys died with the Supabase project's
+  secrets, so on restart you just re-issue from the same free accounts.
 - **Resend** (transactional email) — free tier; leave it.
-- **Google AdSense** — nothing to cancel; it simply stops earning.
+- **Anthropic API** (`ANTHROPIC_API_KEY`) — the *only* pay-per-use service in the repo, used by
+  `scripts/generate-blog-draft.mjs`. It is **not wired to any cron or workflow** — it only spends
+  when you run it by hand, so a parked project costs nothing. No subscription to cancel; revoke the
+  key at console.anthropic.com if you want to be certain.
+- **Affiliate programs** (Ticketmaster/Impact, StubHub, SeatGeek, Vivid Seats, DAZN, etc.) and
+  **AdSense** — these pay *you*. Nothing to cancel; they just stop earning.
 - **Cloudflare** — the Worker is deleted, so no compute. The **domain registration**
   (`silbosports.com`, paid through **June 2027**) is separate and still active — let it lapse or
   keep it as you prefer.
