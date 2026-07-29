@@ -1,8 +1,16 @@
 # Mothball & Restore — Silbo Sports
 
 **Status: MOTHBALLED (2026-07-29).** The site is offline, all automation is stopped, and the
-database is paused. Nothing should be accruing cost. This document is everything needed to bring
-it back.
+Supabase project has been **deleted**. Nothing is accruing cost. This document is everything
+needed to bring it back.
+
+> **The database no longer exists.** Pausing wasn't possible (the Supabase org is on the Pro plan,
+> which blocks pausing, and that plan is shared with two other live projects — `Sel-Fi` and
+> `WasFirst` — so downgrading the whole org wasn't appropriate). The project
+> `gcnbgdpicgeahxscpsfc` was therefore deleted after its structure was snapshotted into this repo.
+> **Rebuilding means creating a fresh project and running the two snapshot files** (see below).
+> The 11 user accounts, all events, competitors and venues are gone — events/competitors/venues
+> re-hydrate from the provider APIs; user accounts do not.
 
 ---
 
@@ -14,8 +22,8 @@ it back.
 | **GitHub Actions — Live Data Monitor** | Schedule (every 30 min) commented out; manual-only. | Uncomment the `schedule:` block in `.github/workflows/live-data-monitor.yml`. |
 | **GitHub Actions — CI** | `push`/`pull_request` triggers commented out; manual-only. | Uncomment the `push:`/`pull_request:` blocks in `.github/workflows/ci.yml`. |
 | **Supabase cron jobs** (7) | All unscheduled via `cron.unschedule`. | Re-run the schedule statements in `supabase/cron.sql` (replace `<project-ref>`; the live jobs used the anon JWT — see that file's comments). |
-| **Supabase project** | **Paused** — compute stops, data retained. | Supabase dashboard → the project → **Restore**. |
-| **Edge Functions** | Left in place (inactive while paused). Source lives in `supabase/functions/`. | Redeploy with the Supabase CLI/MCP if needed. |
+| **Supabase project** (`gcnbgdpicgeahxscpsfc`) | **Deleted.** | Create a new project, then run the two snapshot files (see "Rebuilding" below). |
+| **Edge Functions** | Gone with the project. Source still lives in `supabase/functions/`. | Redeploy from source once a new project exists. |
 
 ### The cron jobs that were removed
 ```
@@ -30,13 +38,9 @@ provider-hydrate-thesportsdb  */15 * * * *
 
 ---
 
-## The database is preserved two ways
+## How the database is preserved
 
-**1. The project is paused, not deleted.** All data (including the 11 auth users) is retained and
-comes back intact on restore. This is the preferred path.
-
-**2. A full structural snapshot is committed to this repo** — insurance in case the project is ever
-deleted, or you want to rebuild elsewhere:
+The live project is gone, so **this repo is the only copy.** Two files, both committed:
 
 - **`supabase/snapshot/full-schema-snapshot.sql`** — the complete live structure: 6 extensions,
   the `private` schema, **40 tables**, all primary/foreign keys, uniques and checks, **86 indexes**,
@@ -49,7 +53,7 @@ deleted, or you want to rebuild elsewhere:
 Provider-derived rows (**events**, **competitors**, **venues**) are deliberately *not* snapshotted —
 they re-hydrate from the APIs and would be stale anyway.
 
-### Rebuilding from the snapshot (only if the project is gone)
+### Rebuilding from the snapshot (this is now the required path)
 1. Create a new Supabase project.
 2. SQL Editor → run `supabase/snapshot/full-schema-snapshot.sql`.
 3. SQL Editor → run `supabase/snapshot/config-data-snapshot.sql`.
@@ -58,7 +62,7 @@ they re-hydrate from the APIs and would be stale anyway.
 6. Update `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env` **and** `wrangler.jsonc`.
 
 > Note: `auth.users` is managed by Supabase and is **not** in the snapshot — a rebuilt project
-> starts with no accounts. Pausing (not deleting) is what preserves the existing users.
+> starts with no accounts. The 11 accounts that existed were deleted with the project.
 
 ---
 
@@ -73,7 +77,9 @@ These live in Supabase → Settings → Edge Functions → Secrets (they are *no
 
 ## Restarting the whole thing, in order
 
-1. **Supabase** → Restore the project. Confirm tables/data are there.
+1. **Supabase** → Create a new project and run both snapshot files. Then update the project ref +
+   publishable key in `.env` **and** `wrangler.jsonc` (both still point at the deleted
+   `gcnbgdpicgeahxscpsfc`).
 2. **Secrets** → re-add any that were rotated/expired while parked.
 3. **API subscriptions** → re-subscribe to whichever providers you cancelled (see below).
 4. **Cron** → re-schedule from `supabase/cron.sql`.
@@ -87,9 +93,10 @@ These live in Supabase → Settings → Edge Functions → Secrets (they are *no
 
 Cancel/downgrade these yourself — they can't be changed from code:
 
-- **Supabase** — pausing stops compute, but a *Pro plan* is billed at the **organization** level and
-  keeps charging even with every project paused. Downgrade the org to Free if this was the only
-  project.
+- **Supabase** — this project is deleted, so it adds no further compute. **The org (`Azr-Erzr's
+  Org`) is still on the Pro plan (~$25/mo base) because two other live projects use it — `Sel-Fi`
+  and `WasFirst`.** Leave Pro as-is unless you also want to park those; Free allows only 2 active
+  projects, which those two would just fit.
 - **PandaScore** (esports data) — paid/keyed plan.
 - **API-Sports / API-Football** (`APISPORTS_KEY`).
 - **TheSportsDB** (`THESPORTSDB_API_KEY`) — paid tier if you're on one.
