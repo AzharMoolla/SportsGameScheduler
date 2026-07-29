@@ -89,18 +89,21 @@ These live in Supabase → Settings → Edge Functions → Secrets (they are *no
 
 ---
 
-## Third-party accounts (billing lives outside this repo)
+## Third-party accounts
 
-Cancel/downgrade these yourself — they can't be changed from code:
+**Nothing here needs cancelling.** Confirmed 2026-07-29: every data provider was on a free/keyed
+tier, so parking the project costs nothing and restarting it doesn't require re-purchasing anything.
 
-- **Supabase** — this project is deleted, so it adds no further compute. **The org (`Azr-Erzr's
-  Org`) is still on the Pro plan (~$25/mo base) because two other live projects use it — `Sel-Fi`
-  and `WasFirst`.** Leave Pro as-is unless you also want to park those; Free allows only 2 active
-  projects, which those two would just fit.
-- **PandaScore** (esports data) — paid/keyed plan.
-- **API-Sports / API-Football** (`APISPORTS_KEY`).
-- **TheSportsDB** (`THESPORTSDB_API_KEY`) — paid tier if you're on one.
-- **Resend** (transactional email) — free tier may be fine to leave.
-- **Google AdSense** — nothing to cancel; it just stops earning.
-- **Cloudflare** — the Worker is deleted. The **domain registration** (`silbosports.com`, expires
-  **June 2027**) is separate and still active; let it lapse or keep it as you prefer.
+- **All data providers — free tier, nothing to cancel.** PandaScore (esports), API-Sports /
+  API-Football, TheSportsDB, OpenF1. Their API keys died with the Supabase project's secrets, so on
+  restart you just re-issue keys from the same free accounts.
+- **Resend** (transactional email) — free tier; leave it.
+- **Google AdSense** — nothing to cancel; it simply stops earning.
+- **Cloudflare** — the Worker is deleted, so no compute. The **domain registration**
+  (`silbosports.com`, paid through **June 2027**) is separate and still active — let it lapse or
+  keep it as you prefer.
+- **Supabase** — this project is deleted and adds no further compute. The org (`Azr-Erzr's Org`) is
+  **still on Pro (~$25/mo)**, but only because two *other* live projects use it: `Sel-Fi` and
+  `WasFirst`. Leave Pro as-is unless you want to park those too (Free allows exactly 2 active
+  projects, which those two would just fit). **This is the only recurring cost, and it isn't this
+  project's.**
