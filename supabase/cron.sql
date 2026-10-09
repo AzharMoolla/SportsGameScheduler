@@ -86,14 +86,12 @@ select cron.schedule(
   $$
 );
 
--- Delete finished events once a day (retention 2 days). Pure SQL — no edge function/HTTP needed.
--- The function is defined in migration 20260622210000_cleanup_past_events.sql. There is no results
--- or archive feature, so past events are storage cost only; TBD placeholder rows (null starts_at)
--- are preserved.
+-- Daily 90-day cleanup; saved/calendar/competition references are protected.
+-- Current function and activation: 20261008052711_event_completion_and_safe_retention.sql.
 select cron.schedule(
   'cleanup-past-events',
-  '30 4 * * *',
-  $$ select public.cleanup_past_events(interval '2 days'); $$
+  '47 6 * * *',
+  $$ select public.cleanup_past_events(); $$
 );
 
 -- OpenF1 Formula 1 schedule/session hydration once daily. This is the current-season F1

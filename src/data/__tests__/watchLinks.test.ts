@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { fallbackWatchOptions } from '../watchLinks'
+import { fallbackWatchOptions, mapWatchRows } from '../watchLinks'
 
 // The where-to-watch boxes resolve league-specific official rights via CATALOG_RULES
 // (docs/where-to-watch-rights-truth.md). These assert the documented broadcaster shows up for the
-// right league + region, and that an unmatched query still falls back to something (never empty).
+// right league + region, without substituting unrelated providers for missing coverage.
 function names(regionCode: string, sportKey: string, leagueName?: string) {
   return fallbackWatchOptions(regionCode, sportKey, 6, leagueName).map((o) => o.name)
 }
@@ -43,6 +43,21 @@ describe('fallbackWatchOptions league-specific rights', () => {
     expect(names('US', 'basketball', 'NBA')).toContain('NBA League Pass')
   })
 
+  it('uses current UFC and Ligue 1 destinations', () => {
+    expect(names('US', 'combat_sports', 'UFC')).toContain('Paramount+')
+    expect(names('US', 'combat_sports', 'UFC')).not.toContain('ESPN+')
+    expect(names('FR', 'soccer', 'Ligue 1')).toContain('Ligue 1+')
+    expect(names('FR', 'soccer', 'Ligue 1')).not.toContain('CANAL+')
+  })
+
+  it('keeps Ireland, Austria and unsupported NHL territories distinct', () => {
+    expect(names('IE', 'soccer', 'UEFA Champions League')).toContain('Premier Sports')
+    expect(names('IE', 'soccer', 'UEFA Champions League')).not.toContain('TNT Sports')
+    expect(names('AT', 'soccer', 'UEFA Champions League')).not.toContain('DAZN')
+    expect(names('NL', 'hockey', 'NHL')).toContain('NHL broadcast guide')
+    expect(names('NL', 'hockey', 'NHL')).not.toContain('NHL.TV on DAZN')
+  })
+
   it('major non-soccer sports keep official first routes', () => {
     expect(names('CA', 'american_football', 'NFL')).toContain('NFL Game Pass on DAZN')
     expect(names('US', 'baseball', 'MLB')).toContain('MLB.TV')
@@ -75,6 +90,23 @@ describe('fallbackWatchOptions league-specific rights', () => {
 
   it('an unmatched league still returns non-empty regional fallback', () => {
     expect(names('US', 'soccer', 'Some Obscure League').length).toBeGreaterThan(0)
+  })
+
+  it('does not substitute an unrelated country or sport for missing coverage', () => {
+    expect(fallbackWatchOptions('ZZ', 'unknown_sport', 6, 'Unknown')).toEqual([])
+    expect(fallbackWatchOptions('DE', 'american_football', 8, 'NFL').some(link => link.name === 'FOX Sports')).toBe(false)
+  })
+
+  it('excludes expired, inactive and unsafe database watch destinations', () => {
+    const base = { provider_key: 'test', label: 'Test', event_id: 'event', league_id: null,
+      country_codes: ['CA'], sport_keys: ['hockey'], link_kind: 'official' as const, url: 'https://example.com', priority: 1,
+      watch_providers: { key: 'test', name: 'Test', network: '', direct_url: 'https://example.com', priority: 1, is_active: true } }
+    const query = { eventId: 'event', regionCode: 'CA', sportKey: 'hockey' }
+    expect(mapWatchRows([base], query)[0]?.scope).toBe('event')
+    expect(mapWatchRows([{ ...base, ends_at: '2020-01-01' }], query)).toEqual([])
+    expect(mapWatchRows([{ ...base, url: 'javascript:alert(1)' }], query)).toEqual([])
+    expect(mapWatchRows([{ ...base, watch_providers: { ...base.watch_providers, is_active: false } }], query)).toEqual([])
+    expect(mapWatchRows([base], { ...query, regionCode: 'DE' })).toEqual([])
   })
 
   // League-name patterns are anchored so look-alikes don't inherit the wrong country's routing.

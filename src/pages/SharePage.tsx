@@ -1,3 +1,4 @@
+import { communityImageUrl } from '../lib/mediaRights'
 import { CalendarDays, Copy, Download } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -36,7 +37,7 @@ export function SharePage() {
       if (cancelled) return
       if (remote) setLeague(remote)
       setLoading(false)
-    })
+    }).catch(() => { if (!cancelled) { setLoading(false); setMessage('Could not load this schedule. Please try again when connected.') } })
     return () => {
       cancelled = true
     }
@@ -49,7 +50,7 @@ export function SharePage() {
     return (
       <EmptyState
         title="Schedule not found"
-        body="This share link is invalid, or the schedule's owner has turned sharing off."
+        body={message || "This share link is invalid, or the schedule's owner has turned sharing off."}
       />
     )
   }
@@ -86,6 +87,7 @@ export function SharePage() {
       <div className="text-center">
         <Badge tone="muted" className="mb-2">Shared schedule</Badge>
         <h1 className="text-2xl font-extrabold text-primary">{league.name}</h1>
+        {communityImageUrl(league.image) && <img src={communityImageUrl(league.image)} alt={`${league.name} image`} className="mx-auto mt-3 h-20 w-20 rounded-lg object-contain" />}
         <p className="text-sm text-ink/60">
           {sportLabels.get(league.sportKey) ?? league.sportKey}
           {league.location && <> - {league.location}</>} - all times {league.timezone}
@@ -102,6 +104,7 @@ export function SharePage() {
       </div>
       {message && <p className="text-center text-sm font-medium text-primary">{message}</p>}
 
+      <div className="flex flex-wrap gap-2">{league.teams.map(team=><span key={team.id} className="flex items-center gap-2 rounded-lg border border-primary/15 p-2 text-sm">{communityImageUrl(team.image) && <img src={communityImageUrl(team.image)} alt="" className="h-10 w-10 rounded-lg object-contain" />}{team.name}</span>)}</div>
       <div className="space-y-3">
         {upcoming.length === 0 && (
           <EmptyState title="No events scheduled" body="Check back — the organizer hasn't added events yet." />
@@ -114,6 +117,7 @@ export function SharePage() {
               <div className="flex w-14 shrink-0 flex-col items-center rounded-lg bg-primary/10 py-2">
                 <CalendarDays size={16} className="text-primary" />
               </div>
+              {communityImageUrl(league.image) && <img src={communityImageUrl(league.image)} alt="" className="h-14 w-14 rounded-lg object-contain" />}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className={`font-bold ${cancelled ? 'line-through' : ''}`}>

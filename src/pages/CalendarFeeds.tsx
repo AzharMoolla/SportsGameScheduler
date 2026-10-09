@@ -1,10 +1,11 @@
-import { CalendarPlus, Copy, ExternalLink, Power, Trash2 } from 'lucide-react'
+import { CalendarPlus, Copy, ExternalLink, Power, Trash2, RotateCcw, RefreshCw } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAppState } from '../app/state-context'
 import { Badge, Button, EmptyState, Field, Panel, PanelHeading } from '../components/ui'
 import { SignUpNudge } from '../components/SignUpNudge'
 import { copyToClipboard } from '../lib/clipboard'
 import { getSupabaseClient } from '../lib/supabase'
+import { useCustomLeagues } from '../data/customLeagues'
 import { mergeFeedsOnSignIn, sha256Hex } from '../data/feeds'
 import { getFeeds, newId, newToken, saveFeeds, type CalendarFeed } from '../lib/store'
 
@@ -21,8 +22,8 @@ function webcalUrl(feed: CalendarFeed) {
   return feedUrl(feed).replace(/^https?:\/\//, 'webcal://')
 }
 
-export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } = {}) {
-  const { followedLeagueIds, followedCompetitorIds, prefs, auth } = useAppState()
+export function CalendarFeedsPage({ embedded = false, customLeagueId }: { embedded?: boolean; customLeagueId?: string } = {}) {
+  const { followedLeagueIds, followedCompetitorIds, followedEventIds, prefs, auth } = useAppState()
   const [feeds, setFeeds] = useState<CalendarFeed[]>(() => getFeeds())
   const [name, setName] = useState('My sports schedule')
   const [includePlaceholders, setIncludePlaceholders] = useState(false)
@@ -30,8 +31,11 @@ export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } =
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const { leagues } = useCustomLeagues()
   const signedIn = Boolean(auth.user)
-  const followCount = followedLeagueIds.length + followedCompetitorIds.length
+  const selectedCustomIds = customLeagueId ? [customLeagueId] : leagues.map(league => league.id)
+  const currentFilters = { leagueIds: customLeagueId ? [] : followedLeagueIds, competitorIds: customLeagueId ? [] : followedCompetitorIds, eventIds: customLeagueId ? [] : followedEventIds, customLeagueIds: selectedCustomIds, reminderMinutes: [60] }
+  const followCount = currentFilters.leagueIds.length + currentFilters.competitorIds.length + currentFilters.eventIds.length + selectedCustomIds.length
 
   // When signed in, the DB is the source of truth. Claim any feed previewed while signed-out into
   // the account, then show the unified server list. Tokens held locally on this device are
@@ -43,7 +47,7 @@ export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } =
       if (!supabase || cancelled) return
       const merged = await mergeFeedsOnSignIn(supabase, auth.user!.id, getFeeds())
       if (!cancelled) setFeeds(merged)
-    })
+    }).catch(() => { if (!cancelled) setMessage('Could not load live feeds. Please try again.') })
     return () => {
       cancelled = true
     }
@@ -59,11 +63,7 @@ export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } =
     setBusy(true)
     setMessage('')
     const token = newToken()
-    const filters = {
-      leagueIds: followedLeagueIds,
-      competitorIds: followedCompetitorIds,
-      reminderMinutes: [60],
-    }
+    const filters = currentFilters
 
     try {
       if (signedIn) {
@@ -121,6 +121,7 @@ export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } =
   }
 
   async function copyUrl(feed: CalendarFeed) {
+    if (!signedIn) { setMessage('Sign in to activate this preview and get a live URL.'); return }
     if (!feed.token) {
       setMessage('This feed’s URL was only shown once at creation. Delete and recreate it to get a new URL.')
       return
@@ -130,30 +131,29 @@ export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } =
   }
 
   function openWebcal(feed: CalendarFeed) {
-    if (!feed.token) return
+    if (!signedIn || !feed.token || !feed.isActive) return
     window.location.href = webcalUrl(feed)
     setMessage('Opening your calendar app if this device supports webcal links.')
   }
 
-  async function toggleActive(feed: CalendarFeed) {
-    const next = !feed.isActive
-    if (signedIn) {
-      const supabase = await getSupabaseClient()
-      if (supabase) await supabase.from('calendar_feeds').update({ is_active: next }).eq('id', feed.id)
-      setFeeds((current) => current.map((f) => (f.id === feed.id ? { ...f, isActive: next } : f)))
-    } else {
-      persistLocal(feeds.map((f) => (f.id === feed.id ? { ...f, isActive: next } : f)))
-    }
-  }
-
-  async function remove(feed: CalendarFeed) {
-    if (signedIn) {
-      const supabase = await getSupabaseClient()
-      if (supabase) await supabase.from('calendar_feeds').delete().eq('id', feed.id)
-      setFeeds((current) => current.filter((f) => f.id !== feed.id))
-    } else {
-      persistLocal(feeds.filter((f) => f.id !== feed.id))
-    }
+  async function updateFeed(feed: CalendarFeed, action: 'active' | 'delete' | 'rotate' | 'selection') {
+    setBusy(true); setMessage('')
+    try {
+      const token = action === 'rotate' ? newToken() : feed.token
+      const next = { ...feed, token, isActive: action === 'active' ? !feed.isActive : feed.isActive, filters: action === 'selection' ? currentFilters : feed.filters }
+      if (signedIn) {
+        const supabase = await getSupabaseClient()
+        if (!supabase) throw new Error('Connection unavailable')
+        const request = action === 'delete' ? supabase.from('calendar_feeds').delete().eq('id', feed.id) : supabase.from('calendar_feeds').update({ is_active: next.isActive, filters: next.filters, ...(action === 'rotate' ? { token_hash: await sha256Hex(token) } : {}) }).eq('id', feed.id)
+        const { data, error } = await request.select('id').single()
+        if (error || !data) throw new Error('Could not save this change. Please try again.')
+        setFeeds(current => action === 'delete' ? current.filter(f => f.id !== feed.id) : current.map(f => f.id === feed.id ? next : f))
+      } else {
+        persistLocal(action === 'delete' ? feeds.filter(f => f.id !== feed.id) : feeds.map(f => f.id === feed.id ? next : f))
+      }
+      setMessage(action === 'rotate' ? 'New URL ready. The old URL no longer works; subscribe again with this URL.' : action === 'selection' ? 'Feed updated to your current selections. Your subscription URL stays the same.' : 'Change saved.')
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save this change.') }
+    finally { setBusy(false) }
   }
 
   return (
@@ -175,7 +175,7 @@ export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } =
         <Panel className="min-w-0 h-fit">
           <PanelHeading
             title="Create a feed"
-            subtitle={`Includes your ${followCount} followed leagues & players, in ${prefs.timezone}.`}
+            subtitle={`Includes your ${followCount} selected leagues, players, events & community schedules, in ${prefs.timezone}.`}
           />
           {!signedIn && <SignUpNudge trigger="feed" className="mb-3" />}
           <form onSubmit={createFeed} className="space-y-3">
@@ -186,7 +186,7 @@ export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } =
                 checked={includePlaceholders}
                 onChange={(event) => setIncludePlaceholders(event.target.checked)}
               />
-              Include TBD placeholders
+              Include events with a date but provisional time
             </label>
             <label className="flex items-center gap-2 text-sm text-ink/70">
               <input
@@ -200,47 +200,50 @@ export function CalendarFeedsPage({ embedded = false }: { embedded?: boolean } =
               <CalendarPlus size={15} /> {busy ? 'Creating…' : 'Create feed'}
             </Button>
             {followCount === 0 && (
-              <p className="text-xs text-ink/50">Follow a league or player first, then create a feed for them.</p>
+              <p className="text-xs text-ink/50">Save an event, follow a league or player, or create a community schedule first, then create a feed for them.</p>
             )}
           </form>
-          <p className="mt-3 text-xs text-ink/50">
+          <p className="mt-3 text-xs text-ink/50">Share a feed URL only with people who may see every selected event, including community notes. A feed holds up to 500 events and 30 days of history.
             Calendar apps decide their own refresh timing — updates can take a few hours to appear.
           </p>
         </Panel>
 
         <div className="min-w-0 space-y-3">
+          <Panel><PanelHeading title="Subscribe in your calendar" /><p className="text-sm text-ink/70">Apple Calendar on Mac: File → New Calendar Subscription, paste the URL, then choose an auto-refresh interval. On iPhone: Calendar → Calendars → Add Calendar → Add Subscription Calendar. Google Calendar on the web: Other calendars → + → From URL. Outlook on the web: Add calendar → Subscribe from web.</p></Panel>
           {feeds.length === 0 && (
             <EmptyState
               title="No feeds yet"
               body="Create a feed, then subscribe to its URL from Apple Calendar, Google Calendar, or Outlook. Your schedule stays current automatically."
             />
           )}
-          {feeds.map((feed) => (
+          {feeds.filter(feed => !customLeagueId || feed.filters.customLeagueIds?.includes(customLeagueId) || feed.filters.customLeagueId === customLeagueId).map((feed) => (
             <Panel key={feed.id} className="flex min-w-0 flex-col items-stretch gap-3 overflow-hidden sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold">{feed.name}</h3>
-                  {feed.isActive ? <Badge tone="secondary">Active</Badge> : <Badge tone="muted">Disabled</Badge>}
+                  {!signedIn ? <Badge tone="muted">Preview</Badge> : feed.isActive ? <Badge tone="secondary">Active</Badge> : <Badge tone="muted">Disabled</Badge>}
                 </div>
                 <p className="mt-0.5 truncate font-mono text-xs text-ink/50">
-                  {feed.token ? feedUrl(feed) : 'URL shown once at creation — copy it then'}
+                  {!signedIn ? 'Sign in to activate a live URL' : feed.token ? feedUrl(feed) : 'Generate a new URL to subscribe from this device'}
                 </p>
                 <p className="text-xs text-ink/50">
-                  {(feed.filters.leagueIds?.length ?? 0) + (feed.filters.competitorIds?.length ?? 0)} picks - {feed.timezone}
+                  {(feed.filters.leagueIds?.length ?? 0) + (feed.filters.competitorIds?.length ?? 0) + (feed.filters.eventIds?.length ?? 0) + (feed.filters.customLeagueIds?.length ?? 0)} picks - {feed.timezone}
                   {feed.includePlaceholders ? ' - TBD included' : ''}
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5 sm:justify-end">
-                <Button variant="subtle" onClick={() => copyUrl(feed)} title="Copy URL" disabled={!feed.token}>
+                <Button variant="ghost" disabled={busy || !signedIn} onClick={() => updateFeed(feed, 'rotate')} title="Generate a new URL"><RotateCcw size={14} /> New URL</Button>
+                <Button variant="ghost" disabled={busy || followCount === 0} onClick={() => updateFeed(feed, 'selection')} title="Update to current selections"><RefreshCw size={14} /> Update picks</Button>
+                <Button variant="subtle" onClick={() => copyUrl(feed)} title="Copy URL" disabled={busy || !signedIn || !feed.token || !feed.isActive}>
                   <Copy size={14} />
                 </Button>
-                <Button variant="subtle" onClick={() => openWebcal(feed)} title="Open webcal subscribe link" disabled={!feed.token}>
+                <Button variant="subtle" onClick={() => openWebcal(feed)} title="Open webcal subscribe link" disabled={busy || !signedIn || !feed.token || !feed.isActive}>
                   <ExternalLink size={14} />
                 </Button>
-                <Button variant="ghost" onClick={() => toggleActive(feed)} title={feed.isActive ? 'Disable' : 'Enable'}>
+                <Button variant="ghost" disabled={busy} onClick={() => updateFeed(feed, 'active')} title={feed.isActive ? 'Disable' : 'Enable'}>
                   <Power size={14} />
                 </Button>
-                <Button variant="danger" onClick={() => remove(feed)} title="Delete">
+                <Button variant="danger" disabled={busy} onClick={() => updateFeed(feed, 'delete')} title="Delete">
                   <Trash2 size={14} />
                 </Button>
               </div>

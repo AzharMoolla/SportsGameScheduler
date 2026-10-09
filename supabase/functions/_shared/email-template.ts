@@ -1,10 +1,6 @@
 import type { AlertCopy, AlertCopyEvent } from './alert-copy.ts'
 
 export type WatchOption = { name: string; url: string; providerKey?: string | null }
-export type TicketOption = { name: string; url: string; affiliate: true }
-
-export const AFFILIATE_DISCLOSURE =
-  'Paid link: Silbo Sports may earn a commission if you buy through this link, at no extra cost to you.'
 
 type RenderAlertEmailOptions = {
   appUrl: string
@@ -25,8 +21,6 @@ type RenderAlertEmailOptions = {
   watch?: WatchOption[]
   /** One-tap "add to calendar" link (Google Calendar template URL). */
   calendarUrl?: string | null
-  /** Event-specific ticket destination. Only supplied when an approved regional contract exists. */
-  ticket?: TicketOption | null
 }
 
 // Countdown is only meaningful for alerts about an event that hasn't started yet.
@@ -163,7 +157,6 @@ export function renderSilboAlertEmail(options: RenderAlertEmailOptions) {
   const start = formatStartParts(options.event.starts_at, tz, options.hour12)
   const countdown = options.kind && UPCOMING_KINDS.has(options.kind) ? countdownLabel(options.event.starts_at) : null
   const watch = options.watch ?? []
-  const ticket = options.ticket ?? null
   const kindLabel = (options.kind ?? 'alert').replace(/_/g, ' ')
 
   const textLines = [
@@ -174,8 +167,6 @@ export function renderSilboAlertEmail(options: RenderAlertEmailOptions) {
     start ? `Start: ${start.full}` : '',
     options.event.venue_name ? `Venue: ${options.event.venue_name}` : '',
     watch.length ? `Where to watch${options.region ? ` (${options.region})` : ''}: ${watch.map((w) => w.name).join(', ')}` : '',
-    ticket ? `Tickets (paid link): ${ticket.name} - ${ticket.url}` : '',
-    ticket ? AFFILIATE_DISCLOSURE : '',
     '',
     `View event: ${eventUrl}`,
     options.calendarUrl ? `Add to calendar: ${options.calendarUrl}` : '',
@@ -197,16 +188,6 @@ export function renderSilboAlertEmail(options: RenderAlertEmailOptions) {
   const calendarButton = options.calendarUrl
     ? `<a class="secondary-button" href="${escapeHtml(options.calendarUrl)}" style="display:inline-block;background:#e7eee3;border:2px solid #9ab9a2;color:#0b6f44;text-decoration:none;font:700 14px/1 ${FONT_SANS};padding:13px 20px;border-radius:9px;margin:0 0 0 10px;">Add to calendar</a>`
     : ''
-  const ticketHtml = ticket
-    ? `<tr>
-          <td class="section-pad" style="padding:18px 28px 6px;">
-            <div style="color:#718178;font:700 11px/1.2 ${FONT_SANS};text-transform:uppercase;letter-spacing:.16em;margin-bottom:10px;">Tickets</div>
-            <a class="ticket-button" href="${escapeHtml(normalizeUrl(ticket.url))}" style="display:inline-block;background:#ffffff;color:#0b6f44;border:2px solid #0b6f44;text-decoration:none;font:700 14px/1 ${FONT_SANS};padding:12px 18px;border-radius:9px;box-shadow:4px 4px 0 #d8e6d8;">Check ${escapeHtml(ticket.name)}</a>
-            <div style="margin-top:10px;color:#53675f;font:400 11.5px/1.5 ${FONT_SANS};"><strong>Paid link:</strong> Silbo Sports may earn a commission if you buy through this link, at no extra cost to you.</div>
-          </td>
-        </tr>`
-    : ''
-
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -239,7 +220,6 @@ export function renderSilboAlertEmail(options: RenderAlertEmailOptions) {
         .ticket-stub { padding:16px !important; border-radius:10px 10px 0 0 !important; }
         .ticket-main { margin-top:0 !important; padding:16px !important; border-left:0 !important; border-top:2px dashed #b9cdbd !important; border-radius:0 0 10px 10px !important; }
         .primary-button, .secondary-button { display:block !important; box-sizing:border-box !important; width:100% !important; margin:10px 0 0 !important; text-align:center !important; }
-        .ticket-button { display:block !important; box-sizing:border-box !important; width:100% !important; text-align:center !important; }
         .watch-badge { min-width:0 !important; }
       }
       a { color:inherit; }
@@ -304,7 +284,6 @@ export function renderSilboAlertEmail(options: RenderAlertEmailOptions) {
               </td>
             </tr>
             ${watchHtml}
-            ${ticketHtml}
             <tr>
               <td class="section-pad" style="padding:16px 28px 30px;">
                 <a class="primary-button" href="${escapeHtml(eventUrl)}" style="display:inline-block;background:#ffffff;color:#0b6f44;border:2px solid #0b6f44;text-decoration:none;font:700 14px/1 ${FONT_SANS};padding:13px 22px;border-radius:9px;box-shadow:5px 5px 0 #d8e6d8;">View event</a>

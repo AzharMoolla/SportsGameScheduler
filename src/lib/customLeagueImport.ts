@@ -1,7 +1,10 @@
+import { leagueTimeToUtc } from './leagueTime'
 import type { CustomEvent } from './store'
 
 type ParseOptions = {
   makeId: () => string
+  timezone?: string
+  existingEvents?: CustomEvent[]
 }
 
 type ParsedCsv = {
@@ -31,7 +34,9 @@ function normalizeHeader(value: string) {
   return HEADER_ALIASES[key] ?? key
 }
 
-function splitCsvLine(line: string) {
+function parseCsv(text: string) {
+  const line = text.replace(/^\uFEFF/, '').replace(/\r\n|\r/g, '\n')
+  const rows: string[][] = []
   const cells: string[] = []
   let current = ''
   let quoted = false
@@ -47,22 +52,20 @@ function splitCsvLine(line: string) {
     } else if (char === ',' && !quoted) {
       cells.push(current.trim())
       current = ''
+    } else if (char === '\n' && !quoted) {
+      cells.push(current.trim())
+      if (cells.some(Boolean)) rows.push([...cells])
+      cells.length = 0
+      current = ''
     } else {
       current += char
     }
   }
 
   cells.push(current.trim())
-  return cells
-}
-
-function parseCsv(text: string) {
-  return text
-    .replace(/^\uFEFF/, '')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map(splitCsvLine)
+  if (quoted) throw new Error('CSV has an unclosed quoted field.')
+  if (cells.some(Boolean)) rows.push(cells)
+  return rows
 }
 
 function normalizeStatus(value: string | undefined): CustomEvent['status'] {
@@ -72,30 +75,34 @@ function normalizeStatus(value: string | undefined): CustomEvent['status'] {
   return 'scheduled'
 }
 
-function parseStart(row: Record<string, string>) {
+function parseStart(row: Record<string, string>, timezone?: string) {
   const explicit = row.startsAt?.trim()
   const date = row.date?.trim()
   const time = row.time?.trim() || '12:00'
   const value = explicit || (date ? `${date}T${time.length === 5 ? `${time}:00` : time}` : '')
   if (!value) return null
 
-  const parsed = new Date(value)
+  let parsed: Date
+  try { parsed = timezone && !/(Z|[+-]\d{2}:?\d{2})$/.test(value) ? leagueTimeToUtc(value.slice(0,10), value.slice(11), timezone) : new Date(value) } catch { return null }
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
 export function parseCustomLeagueEventsCsv(text: string, options: ParseOptions): ParsedCsv {
-  const rows = parseCsv(text)
+  let rows: string[][]
+  try { rows = parseCsv(text) } catch (error) { return { events: [], errors: [String((error as Error).message)] } }
   if (rows.length < 2) return { events: [], errors: ['CSV needs a header row and at least one event row.'] }
 
   const headers = rows[0].map(normalizeHeader)
   const events: CustomEvent[] = []
   const errors: string[] = []
+  const identity = (event: Pick<CustomEvent, 'title' | 'startsAt' | 'opponent'>) => `${event.title.trim().toLowerCase()}|${event.startsAt}|${event.opponent?.trim().toLowerCase() ?? ''}`
+  const seen = new Set((options.existingEvents ?? []).map(identity))
 
   rows.slice(1).forEach((cells, offset) => {
     const rowNumber = offset + 2
     const row = Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']))
     const title = row.title?.trim()
-    const starts = parseStart(row)
+    const starts = parseStart(row, options.timezone)
 
     if (!title) {
       errors.push(`Row ${rowNumber}: missing title.`)
@@ -106,6 +113,9 @@ export function parseCustomLeagueEventsCsv(text: string, options: ParseOptions):
       return
     }
 
+    const candidate = { title, startsAt: starts.toISOString(), opponent: row.opponent?.trim() || undefined }
+    if (seen.has(identity(candidate))) { errors.push(`Row ${rowNumber}: duplicate event skipped.`); return }
+    seen.add(identity(candidate))
     const arriveEarlyMinutes = row.arriveEarlyMinutes ? Number(row.arriveEarlyMinutes) : undefined
     events.push({
       id: options.makeId(),
@@ -113,7 +123,7 @@ export function parseCustomLeagueEventsCsv(text: string, options: ParseOptions):
       startsAt: starts.toISOString(),
       venue: row.venue?.trim() ?? '',
       opponent: row.opponent?.trim() || undefined,
-      arriveEarlyMinutes: Number.isFinite(arriveEarlyMinutes) ? arriveEarlyMinutes : undefined,
+      arriveEarlyMinutes: Number.isFinite(arriveEarlyMinutes) && Number(arriveEarlyMinutes) >= 0 && Number(arriveEarlyMinutes) <= 1440 ? arriveEarlyMinutes : undefined,
       uniformColor: row.uniformColor?.trim() || undefined,
       notes: row.notes?.trim() || undefined,
       status: normalizeStatus(row.status),

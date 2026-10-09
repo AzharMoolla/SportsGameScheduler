@@ -6,7 +6,7 @@ import type { Follow, Preferences } from '../lib/store'
 // into user_follows and preferences into profiles, and merge anything created locally first.
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const DB_TARGET_TYPES = new Set(['sport', 'league', 'competitor', 'custom_league'])
+const DB_TARGET_TYPES = new Set(['sport', 'league', 'competitor', 'event', 'custom_league'])
 
 // Only follows that reference a real DB entity (uuid id) can live in user_follows.target_id.
 // World Cup "team" follows use country-name string ids and stay local-only for now.
@@ -72,7 +72,7 @@ export async function mergeFollowsOnSignIn(
 export async function loadRemotePrefs(supabase: SupabaseClient, userId: string): Promise<Partial<Preferences> | null> {
   const { data } = await supabase
     .from('profiles')
-    .select('default_timezone, default_city, locale, hour12')
+    .select('default_timezone, default_city, locale, hour12, region_code, broadcast_region')
     .eq('user_id', userId)
     .maybeSingle()
   if (!data) return null
@@ -80,6 +80,8 @@ export async function loadRemotePrefs(supabase: SupabaseClient, userId: string):
   if (data.default_timezone) prefs.timezone = data.default_timezone
   if (data.default_city) prefs.city = data.default_city
   if (data.locale) prefs.locale = data.locale
+  if (data.region_code) prefs.regionCode = data.region_code
+  if (data.broadcast_region) prefs.broadcastRegion = data.broadcast_region
   if (data.hour12 !== null && data.hour12 !== undefined) prefs.hour12 = data.hour12
   return prefs
 }
@@ -92,6 +94,8 @@ export async function saveRemotePrefs(supabase: SupabaseClient, userId: string, 
       default_city: prefs.city || null,
       locale: prefs.locale,
       hour12: prefs.hour12,
+      region_code: prefs.regionCode,
+      broadcast_region: prefs.broadcastRegion || prefs.regionCode,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id' },

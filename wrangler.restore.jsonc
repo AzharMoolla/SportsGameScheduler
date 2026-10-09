@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "silbosports",
+  "account_id": "81382f9b2e06bc42d9ef6e1ae2c91144",
+  "main": "worker/restoration.mjs",
+  "compatibility_date": "2026-10-06",
+  "routes": [
+    {
+      "pattern": "silbosports.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.silbosports.com",
+      "custom_domain": true
+    }
+  ],
+  "workers_dev": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

@@ -9,6 +9,7 @@
 // Docs: https://developers.pandascore.co  (auth: Authorization: Bearer <token>)
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { authorizeMaintenance } from '../_shared/maintenance-auth.ts'
 
 const PROVIDER_KEY = 'pandascore'
 const SPORT_KEY = 'esports'
@@ -18,7 +19,7 @@ const BASE = Deno.env.get('PANDASCORE_BASE_URL') ?? 'https://api.pandascore.co'
 const GAMES = (Deno.env.get('PANDASCORE_GAMES') ?? 'lol,dota2,csgo,codmw,r6siege').split(',').map((g) => g.trim()).filter(Boolean)
 const PER_PAGE = Number(Deno.env.get('PANDASCORE_PER_PAGE') ?? 50)
 const CALL_SPACING_MS = Number(Deno.env.get('PANDASCORE_SPACING_MS') ?? 400)
-const CALL_BUDGET = Number(Deno.env.get('PANDASCORE_CALL_BUDGET') ?? GAMES.length)
+const CALL_BUDGET = Math.min(5, Math.max(1, Number(Deno.env.get('PANDASCORE_CALL_BUDGET') ?? 5) || 5))
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
@@ -301,6 +302,8 @@ async function upsertMatches(sportId: string, game: string, matches: PsMatch[], 
 }
 
 Deno.serve(async (req) => {
+  const denied = await authorizeMaintenance(req, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (denied) return denied
   if (!TOKEN) return Response.json({ ok: false, error: 'PANDASCORE_TOKEN not configured' }, { status: 500 })
 
   const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {}

@@ -2,6 +2,18 @@ import { describe, expect, test } from 'vitest'
 import { parseCustomLeagueEventsCsv } from '../customLeagueImport'
 
 describe('parseCustomLeagueEventsCsv', () => {
+  test('preserves quoted multiline notes and prevents repeat imports', () => {
+    const csv = 'date,time,title,notes\n2026-10-20,18:30,Practice,"Bring water\nUse rink 2"'
+    const first = parseCustomLeagueEventsCsv(csv, { makeId: () => 'a', timezone: 'Asia/Tokyo' })
+    expect(first.events[0].notes).toBe('Bring water\nUse rink 2')
+    expect(first.events[0].startsAt).toBe('2026-10-20T09:30:00.000Z')
+    const repeated = parseCustomLeagueEventsCsv(csv, { makeId: () => 'b', timezone: 'Asia/Tokyo', existingEvents: first.events })
+    expect(repeated.events).toEqual([])
+    expect(repeated.errors[0]).toContain('duplicate')
+  })
+  test('rejects unclosed quoted fields', () => {
+    expect(parseCustomLeagueEventsCsv('date,title\n2026-10-20,"Practice', { makeId: () => 'a' }).errors).toEqual(['CSV has an unclosed quoted field.'])
+  })
   test('imports natural spreadsheet columns into custom events', () => {
     let id = 0
     const result = parseCustomLeagueEventsCsv(

@@ -1,18 +1,4 @@
-import {
-  IconBallBasketball,
-  IconBallTennis,
-  IconBallVolleyball,
-  IconBike,
-  IconCricket,
-  IconDeviceGamepad2,
-  IconPingPong,
-  IconPlayHandball,
-  IconPool,
-  IconRugby,
-  IconSwimming,
-  IconTargetArrow,
-  type Icon,
-} from '@tabler/icons-react'
+import { SecondarySportIcon } from '../components/SecondarySportIcon'
 import { ArrowRight, Database, Search, Sparkles, Users } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { useMemo, useState } from 'react'
@@ -28,33 +14,24 @@ type CommunitySport = {
   name: string
   note: string
   lane: 'import' | 'provider-review' | 'community'
-  icon: Icon
+  sport: string
 }
 
 const providerBackedSports = secondarySports
 
 const communitySports: CommunitySport[] = [
-  { name: 'Badminton', note: 'BWF calendars and federation feeds', lane: 'provider-review', icon: IconBallTennis },
-  { name: 'Table Tennis', note: 'ITTF tour, national leagues, and Olympics', lane: 'provider-review', icon: IconPingPong },
-  { name: 'Squash', note: 'PSA World Tour and club calendars', lane: 'provider-review', icon: IconBallTennis },
-  { name: 'Lacrosse', note: 'PLL, World Lacrosse, school and club seasons', lane: 'community', icon: IconTargetArrow },
-  { name: 'Pickleball', note: 'PPA Tour, MLP, and local ladders', lane: 'provider-review', icon: IconPingPong },
-  { name: 'Netball', note: 'Domestic leagues and Commonwealth windows', lane: 'provider-review', icon: IconBallBasketball },
-  { name: 'Field Hockey', note: 'FIH, NCAA, club, and school fixtures', lane: 'provider-review', icon: IconBallTennis },
-  { name: 'Water Polo', note: 'World Aquatics and college seasons', lane: 'provider-review', icon: IconSwimming },
-  { name: 'Esports', note: 'Majors across the big titles', lane: 'provider-review', icon: IconDeviceGamepad2 },
-  { name: 'Softball', note: 'College, pro, and tournament imports', lane: 'import', icon: IconBallTennis },
+  { name: 'Badminton', note: 'BWF calendars and federation feeds', lane: 'provider-review', sport: 'badminton' },
+  { name: 'Table Tennis', note: 'ITTF tour, national leagues, and Olympics', lane: 'provider-review', sport: 'table_tennis' },
+  { name: 'Squash', note: 'PSA World Tour and club calendars', lane: 'provider-review', sport: 'squash' },
+  { name: 'Lacrosse', note: 'PLL, World Lacrosse, school and club seasons', lane: 'community', sport: 'lacrosse' },
+  { name: 'Pickleball', note: 'PPA Tour, MLP, and local ladders', lane: 'provider-review', sport: 'pickleball' },
+  { name: 'Netball', note: 'Domestic leagues and Commonwealth windows', lane: 'provider-review', sport: 'netball' },
+  { name: 'Field Hockey', note: 'FIH, NCAA, club, and school fixtures', lane: 'provider-review', sport: 'field_hockey' },
+  { name: 'Water Polo', note: 'World Aquatics and college seasons', lane: 'provider-review', sport: 'water_polo' },
+  { name: 'Esports', note: 'Majors across the big titles', lane: 'provider-review', sport: 'esports' },
+  { name: 'Softball', note: 'College, pro, and tournament imports', lane: 'import', sport: 'softball' },
 ]
 
-const providerIcons: Record<string, Icon> = {
-  cricket: IconCricket,
-  rugby: IconRugby,
-  volleyball: IconBallVolleyball,
-  handball: IconPlayHandball,
-  cycling: IconBike,
-  snooker: IconPool,
-  darts: IconTargetArrow,
-}
 
 function laneLabel(lane: CommunitySport['lane']) {
   if (lane === 'import') return 'Import'
@@ -63,13 +40,13 @@ function laneLabel(lane: CommunitySport['lane']) {
 }
 
 function SportGlyph({
-  icon: Glyph,
+  sport,
   label,
   color,
   accent,
   size = 'md',
 }: {
-  icon: Icon
+  sport: string
   label: string
   color: string
   accent: string
@@ -84,6 +61,7 @@ function SportGlyph({
         {
           '--glyph-color': color,
           '--glyph-accent': accent,
+          color,
           background:
             'radial-gradient(circle at 35% 25%, color-mix(in srgb, var(--glyph-accent) 30%, transparent), transparent 46%), color-mix(in srgb, var(--glyph-color) 11%, var(--mp-surface))',
           boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--glyph-color) 18%, transparent)',
@@ -97,15 +75,7 @@ function SportGlyph({
         style={{ background: 'color-mix(in srgb, var(--glyph-color) 34%, transparent)' }}
         aria-hidden="true"
       />
-      <Glyph
-        size={size === 'sm' ? 25 : 28}
-        stroke={2}
-        className="relative z-10"
-        style={{
-          color: 'var(--glyph-color)',
-        }}
-        aria-hidden="true"
-      />
+      <SecondarySportIcon sport={sport} size={size === 'sm' ? 36 : 40} className="relative z-10" />
     </span>
   )
 }
@@ -116,8 +86,7 @@ function OtherSportRouteCard({ sport }: { sport: SportInfo }) {
   const liveReady = schedule.configured && !schedule.loading && (schedule.leagues.length > 0 || schedule.events.length > 0)
   const status = schedule.loading ? 'Checking' : liveReady ? 'Live route' : 'Queued'
   const href = `/sports/${sport.key}`
-  const theme = withSurfaceMode(getTheme(sport.key), surfaceMode)
-  const Glyph = providerIcons[sport.key] ?? IconTargetArrow
+  const theme = withSurfaceMode(getTheme('custom'), surfaceMode)
 
   return (
     <Link
@@ -126,7 +95,7 @@ function OtherSportRouteCard({ sport }: { sport: SportInfo }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <SportGlyph icon={Glyph} label={`${sport.label} icon`} color={theme.colors.primary} accent={theme.colors.accent} />
+          <SportGlyph sport={sport.key} label={`${sport.label} icon`} color={theme.colors.primary} accent={theme.colors.accent} />
           <div className="min-w-0">
             <h3 className="truncate text-base font-black uppercase leading-none text-primary">{sport.label}</h3>
             <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-wide text-ink/45">
@@ -252,7 +221,7 @@ export function OtherSportsPage() {
               <div className="absolute inset-y-0 left-0 w-1.5 bg-primary/55" aria-hidden="true" />
               <div className="flex items-start justify-between gap-3 pl-2">
                 <SportGlyph
-                  icon={sport.icon}
+                  sport={sport.sport}
                   label={`${sport.name} icon`}
                   color={theme.colors.primary}
                   accent={theme.colors.accent}

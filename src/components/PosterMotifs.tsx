@@ -14,7 +14,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAppState } from '../app/state-context'
 import { getSport } from '../domain/sports'
-import { getTheme } from '../theme/themes'
+import { getTheme, withSurfaceMode } from '../theme/themes'
 import { SilboBrandMark } from './SilboMark'
 import { SportAssetIcon } from './SportAssetIcon'
 import { Button } from './ui'
@@ -217,7 +217,8 @@ const EventPosterCard = memo(function EventPosterCard({
   active?: boolean
   onActivate?: (index: number) => void
 }) {
-  const theme = getTheme(event.sportKey)
+  const { surfaceMode } = useAppState()
+  const theme = withSurfaceMode(getTheme(event.sportKey), surfaceMode)
   const focus = onActivate ? () => onActivate(index) : undefined
   const wrapperStyle = {
     '--poster-primary': theme.colors.primary,
@@ -285,7 +286,7 @@ export function SpotlightRail({ events }: { events: PosterEvent[] }) {
       </div>
       <div className="site-spotlight-grid">
         {visibleEvents.map((event) => {
-          const theme = getTheme(event.sportKey)
+          const theme = withSurfaceMode(getTheme(event.sportKey), surfaceMode)
           return (
             <Link
               key={`${event.sportKey}-${event.title}`}
@@ -312,7 +313,7 @@ export function GlobalEventBoard({ events, variant = 'compact' }: { events: Post
   const [isMobileCarousel, setIsMobileCarousel] = useState(false)
   const { surfaceMode } = useAppState()
   const activeEvent = events[activeIndex] ?? events[0]
-  const activeTheme = getTheme(activeEvent?.sportKey ?? 'neutral')
+  const activeTheme = withSurfaceMode(getTheme(activeEvent?.sportKey ?? 'neutral'), surfaceMode)
   const iconVariant = surfaceMode === 'program' ? 'brush' : 'neon3d'
   const activate = useCallback((index: number) => setActiveIndex((current) => (current === index ? current : index)), [])
 
@@ -394,8 +395,8 @@ export function GlobalEventBoard({ events, variant = 'compact' }: { events: Post
 
       <div className="relative z-[1] flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="board-label text-neon-magenta">Tonight's world board</p>
-          <h2>{variant === 'room' ? 'Enter the live sports room.' : "Tonight's poster board."}</h2>
+          <p className="board-label text-neon-magenta">Around the sports world</p>
+          <h2>{variant === 'room' ? 'Find your next fixture.' : 'Your sports poster board.'}</h2>
           {activeEvent && (
             <div className="globe-signal-preview" style={{ '--signal-preview-color': activeTheme.colors.primary } as CSSProperties}>
               <SportAssetIcon sportKey={activeEvent.sportKey} size="sm" variant={iconVariant} />
@@ -415,7 +416,7 @@ export function GlobalEventBoard({ events, variant = 'compact' }: { events: Post
         <Bell size={24} className="text-export max-sm:hidden" />
       </div>
 
-      <div className="poster-stack" ref={stackRef} onScroll={onStackScroll} aria-label="Featured sports boards">
+      <div className="poster-stack" role="group" ref={stackRef} onScroll={onStackScroll} aria-label="Featured sports boards">
         {visibleEvents.map((event, index) => (
           <EventPosterCard
             key={event.title}
@@ -427,7 +428,7 @@ export function GlobalEventBoard({ events, variant = 'compact' }: { events: Post
         ))}
       </div>
 
-      <div className="poster-carousel-dots" aria-label="Choose featured board">
+      <div className="poster-carousel-dots" role="group" aria-label="Choose featured board">
         {visibleEvents.map((event, index) => (
           <button
             key={event.title}

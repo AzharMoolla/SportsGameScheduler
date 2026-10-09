@@ -6,11 +6,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { alertCopyFor } from '../_shared/alert-copy.ts'
 import { renderSilboAlertEmail, type WatchOption } from '../_shared/email-template.ts'
-import {
-  buildTicketmasterEmailLink,
-  ticketmasterContractEnvKey,
-  ticketUrlFromMetadata,
-} from '../_shared/ticket-links.ts'
 import { encryptWebPushPayload } from '../_shared/web-push.ts'
 
 const supabase = createClient(
@@ -152,15 +147,6 @@ function regionFromProfile(locale: string | null | undefined, timezone: string |
   return (part || 'US').toUpperCase()
 }
 
-function ticketmasterTrackingUrl(region: string) {
-  const regional = Deno.env.get(ticketmasterContractEnvKey(region))
-  if (regional) return regional
-  // The generic Ticketmaster agreement is the North American fallback. Other territories need
-  // their own campaign link so clicks do not cross program or allowed-domain boundaries.
-  if (region === 'US' || region === 'CA') return Deno.env.get('TICKETMASTER_AFFILIATE_DEFAULT')
-  return undefined
-}
-
 // Official where-to-watch destinations from the DB (watch_links + watch_providers), scoped to the
 // event/league/sport and filtered to the recipient's region. Mirrors the app's `db` tier; returns
 // nothing (graceful) when a competition has no seeded rows.
@@ -172,7 +158,7 @@ async function fetchWatchOptions(
 ): Promise<WatchOption[]> {
   const { data } = await supabase
     .from('watch_links')
-    .select('provider_key, label, country_codes, sport_keys, event_id, league_id, url, priority, watch_providers(name, direct_url)')
+    .select('provider_key, label, country_codes, sport_keys, event_id, league_id, link_kind, url, priority, watch_providers(name, direct_url)')
     .eq('is_active', true)
     .order('priority', { ascending: true })
     .limit(200)
@@ -188,6 +174,7 @@ async function fetchWatchOptions(
     event_id: string | null
     league_id: string | null
     url: string | null
+    link_kind: string
     watch_providers: { name: string | null; direct_url: string | null } | null
     provider_key: string | null
   }>) {
@@ -199,7 +186,9 @@ async function fetchWatchOptions(
     const countries = row.country_codes ?? []
     if (countries.length && !countries.includes(region)) continue
     const name = row.label ?? row.watch_providers?.name
-    const url = row.url ?? row.watch_providers?.direct_url
+    const url = row.link_kind === 'affiliate' || row.link_kind === 'sponsored'
+      ? row.watch_providers?.direct_url
+      : row.url ?? row.watch_providers?.direct_url
     if (!name || !url) continue
     const dedupe = `${name}:${url}`
     if (seen.has(dedupe)) continue
@@ -247,20 +236,6 @@ async function sendReminderEmail(delivery: Delivery) {
   const eventUrl = `${APP_URL}/events/${delivery.event_id}`
   const watch = await fetchWatchOptions(delivery.event_id, row.league_id, row.sports?.key ?? null, region)
   const calendarUrl = buildCalendarUrl(row.title, row.starts_at, row.venues?.name ?? null, eventUrl)
-  const ticket =
-    delivery.kind === 'cancellation' || row.status === 'cancelled' || row.status === 'postponed'
-      ? null
-      : buildTicketmasterEmailLink({
-          trackingUrl: ticketmasterTrackingUrl(region),
-          region,
-          title: row.title,
-          leagueName: row.leagues?.name ?? null,
-          venue: row.venues?.name ?? null,
-          eventId: delivery.event_id,
-          ticketmasterUrl: ticketUrlFromMetadata(row.metadata),
-          placement: `email-${delivery.kind}`,
-        })
-
   const copy = alertCopyFor(
     delivery.kind,
     {
@@ -293,7 +268,6 @@ async function sendReminderEmail(delivery: Delivery) {
     region,
     watch,
     calendarUrl,
-    ticket,
   })
 
   const request: RequestInit = {

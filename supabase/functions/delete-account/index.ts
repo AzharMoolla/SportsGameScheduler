@@ -44,8 +44,11 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+  // Revoke refresh sessions before deleting the account; access tokens still expire normally.
+  const { error: signOutError } = await admin.auth.admin.signOut(token, 'global')
+  if (signOutError) return json({ error: 'Could not revoke account sessions. Please try again.' }, 500)
   const { error: deleteError } = await admin.auth.admin.deleteUser(userId)
-  if (deleteError) return json({ error: deleteError.message }, 500)
+  if (deleteError) return json({ error: 'Could not delete your account. Please try again.' }, 500)
 
   return json({ ok: true })
 })

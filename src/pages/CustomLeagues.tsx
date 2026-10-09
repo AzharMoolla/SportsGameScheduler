@@ -1,3 +1,4 @@
+import { communityImageUrl } from '../lib/mediaRights'
 import { CalendarDays, Plus, Settings, Share2, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -10,8 +11,9 @@ import { newId, newToken, type CustomLeague } from '../lib/store'
 
 export function CustomLeaguesPage() {
   const { prefs } = useAppState()
-  const { leagues, save, remove: removeLeague, signedIn } = useCustomLeagues()
+  const { leagues, save, remove: removeLeague, syncError, signedIn } = useCustomLeagues()
   const [name, setName] = useState('')
+  const [saveError, setSaveError] = useState('')
   const [sportKey, setSportKey] = useState('soccer')
   const [location, setLocation] = useState('')
   const sportLabels = new Map<string, string>(customLeagueSportOptions.map((sport) => [sport.key, sport.label]))
@@ -31,7 +33,8 @@ export function CustomLeaguesPage() {
       events: [],
       createdAt: new Date().toISOString(),
     }
-    save(league)
+    if (!league.name) return
+    try { save(league); setSaveError('') } catch { setSaveError('Could not save. Device storage may be full.'); return }
     setName('')
     setLocation('')
   }
@@ -51,11 +54,12 @@ export function CustomLeaguesPage() {
         </p>
         <p className="mt-1 text-xs text-ink/45">
           {signedIn
-            ? 'Synced to your account — your leagues follow you across devices.'
+            ? 'Account sync enabled — your leagues can follow you across devices.'
             : 'Saved on this device. Sign in to sync across devices and publish share links that work anywhere.'}
         </p>
       </div>
 
+      {(syncError || saveError) && <p role="alert" className="text-sm text-amber-600">{saveError || syncError}</p>}
       {!signedIn && <SignUpNudge trigger="league" />}
 
       <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
@@ -83,8 +87,7 @@ export function CustomLeaguesPage() {
             </Button>
           </form>
         </Panel>
-
-        <div className="space-y-3">
+      <div className="space-y-3">
           {leagues.length === 0 && (
             <EmptyState
               title="No custom leagues yet"
@@ -93,6 +96,7 @@ export function CustomLeaguesPage() {
           )}
           {leagues.map((league) => (
             <Panel key={league.id} className="flex flex-wrap items-center gap-3">
+              {communityImageUrl(league.image) && <img src={communityImageUrl(league.image)} alt="" className="h-14 w-14 rounded-lg object-contain" />}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold">{league.name}</h3>

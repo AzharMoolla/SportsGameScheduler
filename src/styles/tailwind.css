@@ -439,10 +439,6 @@
     color: var(--mp-ticket-stub-text) !important;
   }
 
-  .ticket-provider-ticketmaster { --ticket-provider-color: #026cdf; }
-  .ticket-provider-stubhub { --ticket-provider-color: #3f2b96; }
-  .ticket-provider-seatgeek { --ticket-provider-color: #008b45; }
-  .ticket-provider-vivid { --ticket-provider-color: #c51a42; }
 
   [data-paper] .ticket-provider-badge {
     border-color: color-mix(in srgb, var(--ticket-provider-color) 38%, transparent) !important;
@@ -730,7 +726,7 @@
     box-shadow: inset 0 1px 0 color-mix(in srgb, #f0b93f 16%, transparent), 0 12px 28px rgba(49, 68, 59, 0.08);
   }
 
-  /* Dialogs, dropdowns, install/consent cards, and header popovers share the same translucent
+  /* Dialogs, dropdowns, install cards, and header popovers share the same translucent
      CRT-glass treatment. The small pixel signature sits out of the interaction path. */
   .silbo-modal-panel,
   .silbo-floating-panel,
@@ -4460,4 +4456,184 @@
 :root[data-browser='firefox'] .motion-filter-tab.is-active::after,
 :root[data-browser='firefox'] .motion-filter-pill.is-selected::after {
   display: none !important;
+}
+
+/* Fan-first refresh: retain the sports program identity, with calmer interaction surfaces. */
+@layer components {
+  .home-hero { position: relative; overflow: hidden; box-shadow: none; }
+  .home-hero::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--mp-primary); }
+  .home-headline { font-size: clamp(2.5rem, 5.4vw, 4.4rem); line-height: 1.04; letter-spacing: -0.045em; text-wrap: balance; }
+  .home-next-panel { min-height: 320px; }
+  .home-sport-link { display: inline-flex; align-items: center; min-height: 36px; padding: 0.35rem 0.8rem; border: 1px solid color-mix(in srgb,var(--mp-primary) 20%,transparent); border-radius: 999px; font-size: 0.8rem; font-weight: 600; color: var(--mp-text); transition: background 150ms ease, border-color 150ms ease; }
+  .home-sport-link:hover { background: color-mix(in srgb,var(--mp-primary) 10%,transparent); border-color: var(--mp-primary); }
+  .silbo-button { box-shadow: none; transition: background-color 160ms ease, color 160ms ease, transform 160ms ease; }
+  .silbo-button:active:not(:disabled) { transform: translateY(1px); }
+  .silbo-skip-link { position: fixed; top: 8px; left: 12px; z-index: 100; padding: 0.8rem 1rem; color: var(--mp-bg); background: var(--mp-primary); border-radius: 8px; transform: translateY(-160%); }
+  .silbo-skip-link:focus { transform: none; }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--mp-primary); outline-offset: 4px; }
+  .page-scene-content .silbo-glass-panel::before { display: none; }
+  .crt-side-signal { opacity: 0.14; }
+  .page-signal-layer { opacity: 0.3; }
+  [data-paper] .crt-side-signal { opacity: 0.08; }
+  @media (prefers-reduced-motion: reduce) { .silbo-button, .home-sport-link { transition: none; transform: none; } }
+}
+
+/* Quieter broadcast texture lets fixtures and controls carry the page. */
+@layer components {
+  .broadcast-air { opacity: .45; }
+  .broadcast-air::after, [data-paper] .broadcast-air::after { opacity: .16; }
+  [data-paper] .broadcast-air { opacity: .32; }
+}
+
+/* Matchday print: sport colours, a stronger world board, and readable brand badges. */
+@layer components {
+  .watch-provider-badge[class~='text-white'], .watch-provider-badge[class~='text-paper'] { color: #fffaf0 !important; }
+  .watch-provider-badge[class~='text-void'] { color: #101917 !important; }
+  .watch-provider-badge { min-height: 32px; }
+  .global-event-board-room { border-color: color-mix(in srgb, var(--mp-primary) 32%, transparent); }
+  [data-paper] .global-event-board-room .poster-globe {
+    background:
+      radial-gradient(ellipse at 25% 32%, #55997f88, transparent 44%),
+      radial-gradient(ellipse at 76% 50%, #5793ad66, transparent 46%),
+      radial-gradient(ellipse at 46% 83%, #daa04477, transparent 48%),
+      repeating-linear-gradient(90deg, #284f4630 0 1px, transparent 1px 28px),
+      repeating-linear-gradient(0deg, #284f4625 0 1px, transparent 1px 28px),
+      #e5e8d2;
+    opacity: .82;
+  }
+  [data-paper] .globe-signal-preview { background: #fffaf0; border-color: #35785c; box-shadow: 0 6px 18px #28544314; }
+  [data-paper] .poster-orbit { opacity: .62; }
+  .broadcast-air { opacity: .7; }
+  .broadcast-air::after { opacity: .26; }
+  [data-paper] .broadcast-air { opacity: .5; }
+  [data-paper] .broadcast-air::after { opacity: .23; }
+}
+
+
+/* Opt-in Blender basketball study: one continuous scene with live HTML content. */
+.sport-channel-banner.sport-channel-banner--studio {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  min-height: 440px;
+  padding: 32px 38% 32px 30%;
+  background: #111819 var(--sport-channel-studio) center / cover no-repeat;
+  content-visibility: visible;
+}
+[data-paper] .sport-channel-banner.sport-channel-banner--studio {
+  background: #eee8d9 var(--sport-channel-studio) center / cover no-repeat;
+}
+.sport-channel-banner--studio .sport-channel-panel,
+.sport-channel-banner.sport-channel-banner--studio::before,
+.sport-channel-banner.sport-channel-banner--studio::after { display: none; }
+.sport-channel-banner--studio .sport-channel-title { padding: 0; gap: 16px; }
+.sport-channel-banner--studio .sport-channel-title h1 { font-size: clamp(28px, 3vw, 44px); color: #fff4e6; }
+.sport-channel-banner--studio .sport-channel-title > p,
+.sport-channel-banner--studio .sport-channel-stats dd { color: #edc8a4; }
+.sport-channel-banner--studio .sport-channel-stats dt { color: #fff4e6; }
+.sport-channel-banner--studio .sport-channel-copy { border: 0; padding: 0; gap: 14px; }
+.sport-channel-banner--studio .sport-channel-copy p { max-width: none; color: #eee4d7; font-size: 14px; }
+.sport-channel-banner--studio .sport-channel-cta { color: #fff4e6; border-color: #daaa7b; background: #111819; }
+[data-paper] .sport-channel-banner--studio .sport-channel-title h1,
+[data-paper] .sport-channel-banner--studio .sport-channel-stats dt { color: #38261c; }
+[data-paper] .sport-channel-banner--studio .sport-channel-title > p,
+[data-paper] .sport-channel-banner--studio .sport-channel-stats dd { color: #754224; }
+[data-paper] .sport-channel-banner--studio .sport-channel-copy p { color: #493d32; }
+[data-paper] .sport-channel-banner--studio .sport-channel-cta { color: #38261c; background: #f6edda; }
+@media (max-width: 900px) {
+  .sport-channel-banner.sport-channel-banner--studio {
+    min-height: 0;
+    padding: clamp(150px, 35vw, 300px) 24px 24px;
+    background-size: 100% auto;
+    background-position: center top;
+    background-color: #111819;
+  }
+  [data-paper] .sport-channel-banner.sport-channel-banner--studio {
+    background-size: 100% auto;
+    background-position: center top;
+    background-color: #eee8d9;
+  }
+}
+
+/* Image-led concept reference, kept distinct from the Blender implementation. */
+.sport-channel-banner.sport-channel-banner--concept {
+  padding-left: 30%;
+  padding-right: 36%;
+}
+.sport-channel-banner--concept .sport-channel-cta {
+  border-radius: 0;
+  border-color: var(--mp-primary);
+  background: transparent;
+}
+[data-paper] .sport-channel-banner--concept .sport-channel-cta {
+  background: transparent;
+  border-color: var(--sport-channel-readable);
+}
+@media (max-width: 900px) {
+  .sport-channel-banner.sport-channel-banner--concept { padding-left: 24px; padding-right: 24px; }
+}
+
+/* The new equipment silhouettes need slightly more room beside the live copy. */
+@media (min-width: 901px) {
+  .sport-channel-banner.sport-channel-banner--wide-equipment {
+    padding-left: 36%;
+    padding-right: 32%;
+  }
+  [data-paper] .sport-channel-banner.sport-channel-banner--wide-equipment {
+    /* Soften pigment behind the copy without altering the source painting. */
+    background-image: linear-gradient(to right,
+      transparent 33%, rgba(246, 237, 218, .92) 36%,
+      rgba(246, 237, 218, .92) 68%, transparent 72%),
+      var(--sport-channel-studio);
+  }
+}
+
+/* The broadcast tube owns the artwork; none of these elements travels with a card.
+   A narrow screen gets registration marks/decals, a wide screen reveals the courts. */
+@layer components {
+  .ambient-broadcast-art { position: absolute; inset: 0; pointer-events: none; --ambient-green: #20d77b; --ambient-cyan: #45c7d4; --ambient-pink: #ef6baf; --ambient-amber: #f0b93f; }
+  .broadcast-air { opacity: 1; }
+  [data-paper] .broadcast-air { opacity: 1; }
+  [data-paper] .ambient-broadcast-art { --ambient-green: #24845a; --ambient-cyan: #278894; --ambient-pink: #b45586; --ambient-amber: #a97926; }
+  .ambient-edge { position: absolute; inset-block: 8% 5%; width: clamp(90px, calc((100vw - 1460px) / 2 + 56px), 250px); mask-image: linear-gradient(90deg, black 0%, black 30%, transparent 100%); }
+  .ambient-edge-left { left: 0; }
+  .ambient-edge-right { right: 0; transform: scaleX(-1); }
+  .ambient-edge svg { width: 180px; height: 100%; overflow: visible; }
+  .ambient-edge-right svg { transform: translateY(54px); }
+  .ambient-registration { stroke: var(--ambient-amber); stroke-width: 1; opacity: .38; }
+  .ambient-sport { stroke: var(--ambient-green); stroke-width: 1; opacity: .25; }
+  .ambient-sport-track { stroke: var(--ambient-cyan); }
+  .ambient-edge-right .ambient-sport-court { stroke: var(--ambient-pink); }
+  .ambient-edge-right .ambient-sport-track { stroke: var(--ambient-amber); }
+  .ambient-signal { stroke: var(--ambient-pink); stroke-width: 1; opacity: .32; }
+  .ambient-travel { stroke-width: 2; stroke-dasharray: 9 91; animation: ambient-sweep 19s linear infinite; opacity: .9; }
+  .ambient-sport-track .ambient-travel { animation-duration: 27s; animation-delay: -12s; }
+  .ambient-signal .ambient-travel { animation-duration: 23s; animation-delay: -8s; }
+  .ambient-edge-right .ambient-travel { animation-delay: -15s; animation-direction: reverse; }
+  .ambient-decal { position: absolute; left: 4px; display: grid; grid-template-columns: 8px 5px; gap: 4px; opacity: .55; animation: ambient-decal-light 17s ease-in-out infinite; }
+  .ambient-decal-a { top: 13%; }
+  .ambient-decal-b { top: 72%; animation-duration: 23s; animation-delay: -9s; }
+  .ambient-edge-right .ambient-decal-a { top: 34%; animation-delay: -7s; }
+  .ambient-edge-right .ambient-decal-b { top: 86%; }
+  .ambient-decal i { width: 8px; height: 8px; background: var(--ambient-cyan); }
+  .ambient-decal i:nth-child(2) { width: 5px; height: 5px; background: var(--ambient-pink); }
+  .ambient-decal i:nth-child(3) { width: 5px; height: 5px; background: var(--ambient-amber); }
+  .ambient-decal i:nth-child(4) { background: var(--ambient-green); }
+  .ambient-edge-light { position: absolute; left: 1px; top: 25%; width: 2px; height: 80px; background: linear-gradient(transparent, var(--ambient-cyan), transparent); opacity: .22; animation: ambient-edge-pass 24s ease-in-out infinite; }
+  .ambient-edge-right .ambient-edge-light { background: linear-gradient(transparent, var(--ambient-pink), transparent); animation-delay: -13s; }
+  @keyframes ambient-sweep { 0% { stroke-dashoffset: 100; opacity: .2; } 25%, 65% { opacity: 1; } 100% { stroke-dashoffset: -100; opacity: .2; } }
+  @keyframes ambient-decal-light { 0%, 35%, 100% { opacity: .3; } 48%, 58% { opacity: .72; } 72% { opacity: .42; } }
+  @keyframes ambient-edge-pass { 0%, 100% { transform: translateY(-45px); opacity: .12; } 50% { transform: translateY(180px); opacity: .55; } }
+  :root[data-ambient-paused='true'] .ambient-broadcast-art * { animation-play-state: paused; }
+  @media (max-width: 899px) {
+    .ambient-edge { width: 38px; mask-image: linear-gradient(90deg, black, transparent); }
+    .ambient-edge svg { opacity: .55; }
+    .ambient-sport { display: none; }
+    .ambient-edge-light { height: 48px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ambient-broadcast-art * { animation: none !important; }
+    .ambient-travel { display: none; }
+  }
 }

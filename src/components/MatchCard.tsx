@@ -1,4 +1,5 @@
-import { AlertTriangle, Bell, ChevronDown, Download, MapPin, RadioTower, Ticket, Tv } from 'lucide-react'
+import { FinalResult } from './FinalResult'
+import { AlertTriangle, Bell, ChevronDown, Download, MapPin, RadioTower, Tv } from 'lucide-react'
 import { useState } from 'react'
 import { CountryFlagMark } from './CountryFlagMark'
 import type { Match } from '../domain/match'
@@ -6,7 +7,6 @@ import type { OverlapTier } from '../lib/sportTiming'
 import { formatDate, formatLongDate, formatTime } from '../lib/time'
 import { WatchOptionsPanel } from './WatchOptionsPanel'
 import { WatchProviderBadges } from './WatchProviderBadges'
-import { TicketOptionsPanel } from './TicketOptionsPanel'
 
 // Schedule events render as TICKETS (Channel S rule): cream paper on the broadcast void,
 // deep sport-specific time stub with perforated edge, ink type. The on-screen card, the
@@ -176,6 +176,7 @@ export function MatchCard({
         </div>
       </div>
 
+      <FinalResult status={match.exportEvent?.status ?? "scheduled"} metadata={match.exportEvent?.metadata} />
       {expanded && (
         <div className="mx-4 mb-3 grid animate-[ticket-open_160ms_ease-out] gap-3 border-t border-dashed border-paper-ink/25 pt-3 text-paper-ink md:grid-cols-[1fr_280px]">
           <div className="grid gap-2 text-sm text-paper-ink/70 sm:grid-cols-2">
@@ -215,20 +216,6 @@ export function MatchCard({
               <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-paper-ink">
                 <Bell size={12} /> Alert settings can watch time, team, venue, and watch-info changes.
               </p>
-            </div>
-            <div className="rounded-lg border border-paper-ink/15 bg-paper-ink/4 p-3">
-              <p className="mb-2 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-paper-ink">
-                <Ticket size={13} /> Tickets
-              </p>
-              <TicketOptionsPanel
-                title={title}
-                leagueName="FIFA World Cup 2026"
-                venue={match.ground}
-                regionCode={regionCode}
-                placement="web-worldcup-match-card"
-                limit={3}
-                compact
-              />
             </div>
           </div>
         </div>

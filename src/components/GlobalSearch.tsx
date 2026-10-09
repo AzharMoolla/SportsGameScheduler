@@ -47,11 +47,13 @@ export function GlobalSearch({ placeholder, autoFocus }: { placeholder: string; 
     if (!results.length) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
+      setOpen(true)
       setActive((i) => (i + 1) % results.length)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
+      setOpen(true)
       setActive((i) => (i - 1 + results.length) % results.length)
-    } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter' && open) {
       e.preventDefault()
       const choice = results[activeIndex]
       if (choice) go(choice.to)
@@ -62,7 +64,7 @@ export function GlobalSearch({ placeholder, autoFocus }: { placeholder: string; 
 
   return (
     <div ref={ref} className="relative">
-      <label className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 shadow-sm">
+      <label className="global-search-field flex min-h-12 items-center gap-3 rounded-lg border border-primary/25 bg-page px-4 py-3 focus-within:ring-2 focus-within:ring-primary/40">
         <Search size={18} className="text-ink/40" />
         <input
           value={query}
@@ -75,10 +77,12 @@ export function GlobalSearch({ placeholder, autoFocus }: { placeholder: string; 
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
+          aria-label={placeholder}
           role="combobox"
           aria-expanded={showDropdown}
           aria-controls={listId}
           aria-autocomplete="list"
+          aria-activedescendant={showDropdown && results.length ? `${listId}-${activeIndex}` : undefined}
           className="min-w-0 flex-1 bg-transparent text-sm outline-none"
         />
       </label>
@@ -100,7 +104,9 @@ export function GlobalSearch({ placeholder, autoFocus }: { placeholder: string; 
                 <button
                   key={result.id}
                   type="button"
+                  id={`${listId}-${index}`}
                   role="option"
+                  tabIndex={-1}
                   aria-selected={index === activeIndex}
                   onMouseEnter={() => setActive(index)}
                   onClick={() => go(result.to)}

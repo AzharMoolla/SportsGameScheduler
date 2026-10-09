@@ -28,14 +28,14 @@ export function createNotesText(
   const teamLine = selectedTeams.length ? selectedTeams.join(', ') : 'All confirmed group-stage teams'
   const lines = filteredMatches.map((match, index) => {
     return [
-      `${index + 1}. ${match.team1} vs ${match.team2}`,
+      `${index + 1}. ${match.team1}${match.team2 ? ` vs ${match.team2}` : ''}`,
       `   ${formatLongDate(match.startsAt, timeZone, timeOptions)} at ${formatTime(match.startsAt, timeZone, timeOptions)}`,
       `   ${match.group ?? ''} - ${match.round} - ${match.ground}`,
     ].join('\n')
   })
 
   return [
-    `${brand.appName} - World Cup 2026 schedule`,
+    `${brand.appName} - sports schedule`,
     `${cityLabel} local time - ${timeZone}`,
     `Teams: ${teamLine}`,
     '',

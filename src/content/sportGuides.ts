@@ -1,7 +1,7 @@
 import type { CanonicalSportKey } from '../domain/types'
 
 // Original, evergreen editorial copy rendered VISIBLY on each /sports/:key hub (see SportPage).
-// This is the substance an AdSense reviewer and a JS-rendering crawler actually read — distinct,
+// This is the substance sports fans and a JS-rendering crawler actually read — distinct,
 // sport-specific prose, not the templated fixture boilerplate. English-only by design; if a guide
 // later earns localization it can move into the i18n table.
 //
@@ -28,14 +28,14 @@ export const sportGuides: Partial<Record<CanonicalSportKey, SportGuide>> = {
   soccer: {
     heading: 'Soccer schedules in your local time',
     banner:
-      'The World Cup, the Champions League and a dozen domestic leagues, all on different clocks — follow your teams and every kickoff converts to where you are.',
+      'Club football, international competitions and domestic leagues, all on different clocks — follow your teams and every kickoff converts to where you are.',
     intro: [
-      'Soccer is the hardest sport to keep up with by hand: the World Cup, UEFA club competitions, the Premier League, La Liga, Serie A, the major continental cups and dozens of domestic leagues all run on their own calendars, in their own time zones, often overlapping across a single weekend. A kickoff listed as 3:00pm in England is 10:00am on the U.S. East Coast and the early hours of the next morning in Australia — and that math is exactly where plans fall apart.',
-      'Silbo Sports pulls upcoming soccer fixtures into one place and converts every kickoff to the time zone on your device. Follow a national team for the World Cup, a club for a full league season, or an individual competition, and the matches that matter to you sit together in a single schedule you can sort, sync and share.',
+      'Soccer is the hardest sport to keep up with by hand: UEFA club competitions, the Premier League, La Liga, Serie A, the major continental cups and dozens of domestic leagues all run on their own calendars, in their own time zones, often overlapping across a single weekend. A kickoff listed as 3:00pm in England is 10:00am on the U.S. East Coast and the early hours of the next morning in Australia — and that math is exactly where plans fall apart.',
+      'Silbo Sports pulls upcoming soccer fixtures into one place and converts every kickoff to the time zone on your device. Follow a national team, a club for a full league season, or an individual competition, and the matches that matter to you sit together in a single schedule you can sort, sync and share.',
     ],
     howToWatch: 'Pick the teams, leagues or tournaments you care about and Silbo lists their next fixtures with the kickoff already converted to your local time. Add any match to your phone or desktop calendar with one tap, set a reminder before kickoff, and check the "where to watch" links for the broadcasters and streams carrying it in your region.',
     faqs: [
-      { q: 'How are World Cup match times shown?', a: 'Every World Cup 2026 kickoff is converted from the venue time to the local time on your device, so you never have to work out the offset between the host cities and where you are watching.' },
+      { q: 'How are kickoff times shown?', a: 'Each kickoff appears in your selected time zone, with its date and local start time.' },
       { q: 'Can I follow more than one league at once?', a: 'Yes. Follow as many teams, leagues and competitions as you like — the Premier League, La Liga, Champions League and your national team can all live in the same schedule, sorted by date and time.' },
       { q: 'What happens when a kickoff time changes?', a: 'When a fixture is rescheduled or moved for broadcast, the updated time syncs through automatically, and a subscribed calendar feed updates in place without you re-adding anything.' },
     ],

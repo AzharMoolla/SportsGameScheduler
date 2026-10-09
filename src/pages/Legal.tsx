@@ -3,13 +3,10 @@ import { Link } from 'react-router-dom'
 import { brand } from '../domain/brand'
 import { useDocumentMeta } from '../lib/seo'
 
-// Public legal surfaces required before a public beta that collects emails, sends magic links,
-// and (soon) serves ads. Content is written to match what the app actually does — see
-// src/lib/store.ts (local data), src/app/state.tsx (Supabase sync), and src/lib/ads.ts
-// (AdSense + affiliate). The consent banner (src/components/ConsentBanner.tsx) gates ad cookies.
+// Public information describing the data used for schedules, accounts and alerts.
 
 const CONTACT_EMAIL = 'privacy@silbosports.com'
-const LAST_UPDATED = 'June 22, 2026'
+const LAST_UPDATED = 'October 9, 2026'
 
 function LegalLayout({ title, intro, children }: PropsWithChildren<{ title: string; intro: ReactNode }>) {
   return (
@@ -54,7 +51,7 @@ export function PrivacyPage() {
   useDocumentMeta({
     title: 'Privacy Policy - Silbo Sports',
     description:
-      'How Silbo Sports handles account details, schedules, alerts, cookies, advertising consent, and your privacy choices.',
+      'How Silbo Sports handles account details, schedules, alerts, essential storage and your privacy choices.',
     canonicalPath: '/privacy',
   })
 
@@ -67,7 +64,7 @@ export function PrivacyPage() {
         <ul>
           <li>You can use {brand.appName} without an account. Your picks live in your browser.</li>
           <li>If you sign in, we store your email, your follows, and your display preferences so your schedule follows you across devices.</li>
-          <li>We don&apos;t sell your data. We don&apos;t run ad-tracking cookies until you accept them.</li>
+          <li>We don&apos;t sell your data or load advertising trackers.</li>
           <li>You can export everything and delete your account at any time from your{' '}
             <Link to="/account">account page</Link>.</li>
         </ul>
@@ -76,7 +73,7 @@ export function PrivacyPage() {
       <Section id="what-we-collect" heading="What we collect">
         <ul>
           <li>
-            <strong>Account</strong> — your email address, used to sign you in with a magic link or Google, and to send any
+            <strong>Account</strong> — your email address, used to sign you in with a magic link, and to send any
             alerts you opt into. We never see or store a password.
           </li>
           <li>
@@ -88,6 +85,9 @@ export function PrivacyPage() {
             <strong>Calendar feeds &amp; alerts</strong> — if you create a subscribed calendar feed or enable email/push
             reminders, we store the feed configuration, your alert preferences, and (for push) your browser&apos;s push
             subscription.
+          </li>
+          <li>
+            <strong>Community images</strong> — league, team and player images are resized to small thumbnails in your browser. Photo metadata and original files are not uploaded. Thumbnails are saved with league data locally and, when signed in, in Supabase. They can appear on a public share page when you enable sharing. Upload only images you have permission to use and share.
           </li>
           <li>
             <strong>Basic technical data</strong> — standard server logs (IP address, browser type, timestamps) kept by our
@@ -104,16 +104,11 @@ export function PrivacyPage() {
         <ul>
           <li>
             <strong>Essential storage</strong> — we use your browser&apos;s local storage to remember your picks, preferences,
-            and consent choice. This is required for the app to work and is never used for tracking.
-          </li>
-          <li>
-            <strong>Advertising</strong> — when ads are enabled, our ad partner (Google AdSense) may set cookies. These load
-            only after you accept advertising cookies in the consent banner. If you decline, we ask the ad partner to serve
-            non-personalized ads only.
+            and sign-in session. This is required for the app to work and is never used for tracking.
           </li>
         </ul>
         <p>
-          You can change your choice any time by clearing site data, or by using the consent control at the bottom of the page.
+          You can remove locally saved picks and preferences by clearing site data. Silbo does not use advertising cookies.
         </p>
       </Section>
 
@@ -122,10 +117,8 @@ export function PrivacyPage() {
         <ul>
           <li><strong>Supabase</strong> — authentication and database (your account, follows, preferences).</li>
           <li><strong>Cloudflare</strong> — hosting and content delivery.</li>
-          <li><strong>Resend</strong> — sending magic-link and alert emails.</li>
-          <li><strong>Google AdSense</strong> — advertising, only after consent.</li>
-          <li><strong>Affiliate networks</strong> — when you tap a &ldquo;where to watch&rdquo; link, the destination provider
-            and its affiliate network may know the click came from {brand.appName}. We never share your identity with them.</li>
+          <li><strong>Email delivery</strong> — sign-in emails use Supabase authentication. Email and push event alerts are currently paused; Resend is a configured option for future alert delivery.</li>
+          <li><strong>Broadcasters</strong> — direct links open the broadcaster&apos;s own website, which has its own privacy policy. Silbo adds no affiliate tracking.</li>
         </ul>
       </Section>
 
@@ -144,8 +137,9 @@ export function PrivacyPage() {
       <Section id="retention" heading="How long we keep data">
         <p>
           We keep account data for as long as your account exists. When you delete your account, your profile, follows,
-          calendar feeds, alert preferences, and push subscriptions are deleted. Backups and provider logs roll off on their
-          own schedules (typically within 30–90 days).
+          calendar feeds, alert preferences, and push subscriptions are deleted. Internal hydration run logs are retained
+          for 30 days and dispatch logs for 14 days. Our current Supabase Free project has no automatic database backup service;
+          we do not promise a backup deletion period that has not been established.
         </p>
       </Section>
 
@@ -201,11 +195,11 @@ export function TermsPage() {
         </p>
       </Section>
 
-      <Section id="ads" heading="Advertising &amp; affiliate links">
+      <Section id="experience" heading="An experience for fans">
         <p>
-          {brand.appName} may show ads and include affiliate &ldquo;where to watch&rdquo; links. Affiliate links are labeled;
-          we may earn a commission at no extra cost to you. We never let advertising compromise the accuracy of schedule data,
-          and we keep paid ads off community and custom-league surfaces.
+          {brand.appName} provides schedules and calendar tools without ads or affiliate promotions.
+          Broadcaster links are provided to help you find coverage in your region. Their availability,
+          subscription requirements and terms are controlled by the broadcaster.
         </p>
       </Section>
 

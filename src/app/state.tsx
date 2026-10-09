@@ -132,6 +132,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     () => follows.filter((f) => f.targetType === 'team').map((f) => f.targetId),
     [follows],
   )
+  const followedEventIds = useMemo(() => follows.filter(f => f.targetType === 'event').map(f => f.targetId), [follows])
   const followedLeagueIds = useMemo(
     () => follows.filter((f) => f.targetType === 'league').map((f) => f.targetId),
     [follows],
@@ -173,6 +174,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       follows,
       toggleFollow,
       followedTeams,
+      followedEventIds,
       followedLeagueIds,
       followedCompetitorIds,
       prefs,
@@ -191,6 +193,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       authReady,
       follows,
       followedTeams,
+      followedEventIds,
       followedLeagueIds,
       followedCompetitorIds,
       prefs,

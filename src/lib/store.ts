@@ -1,3 +1,4 @@
+import type { CommunityImage } from './mediaRights'
 // Local persistence layer, deliberately shaped like the future Supabase API surface.
 //
 // Until the backend is connected, follows, preferences, calendar feeds, and custom leagues
@@ -6,7 +7,7 @@
 // this module's internals for supabase-js calls later does not ripple through the UI.
 // On sign-up, anything stored here is merged into the user's account (Objective 14.2).
 
-export type FollowTargetType = 'sport' | 'league' | 'team' | 'competitor' | 'custom_league'
+export type FollowTargetType = 'sport' | 'league' | 'team' | 'competitor' | 'event' | 'custom_league'
 
 export type Follow = {
   targetType: FollowTargetType
@@ -37,6 +38,9 @@ export type CalendarFeed = {
     sportKey?: string
     leagueIds?: string[]
     competitorIds?: string[]
+    eventIds?: string[]
+    customLeagueId?: string
+    customLeagueIds?: string[]
     reminderMinutes?: number[]
   }
   includePlaceholders: boolean
@@ -46,6 +50,8 @@ export type CalendarFeed = {
 }
 
 export type CustomTeam = {
+  image?: CommunityImage
+  kind?: 'team' | 'player'
   id: string
   name: string
   color: string
@@ -55,6 +61,9 @@ export type CustomEvent = {
   id: string
   title: string
   startsAt: string
+  endsAt?: string
+  updatedAt?: string
+  version?: number
   venue: string
   opponent?: string
   arriveEarlyMinutes?: number
@@ -64,6 +73,7 @@ export type CustomEvent = {
 }
 
 export type CustomLeague = {
+  image?: CommunityImage
   id: string
   name: string
   sportKey: string
@@ -196,6 +206,7 @@ export function getCustomLeagues(): CustomLeague[] {
 }
 
 export function saveCustomLeagues(leagues: CustomLeague[]) {
+  if (JSON.stringify(leagues).length > 3000000) throw new Error('This device’s league storage is full. Remove unused images or leagues before saving.')
   write(KEYS.customLeagues, leagues)
 }
 

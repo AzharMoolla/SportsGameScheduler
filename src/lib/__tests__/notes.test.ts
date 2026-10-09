@@ -24,7 +24,7 @@ describe('createNotesText', () => {
       true,
     )
 
-    expect(text).toContain('World Cup 2026 schedule')
+    expect(text).toContain('sports schedule')
     expect(text).toContain('Mexico vs South Africa')
     expect(text).toContain('Estadio Azteca, Mexico City')
   })

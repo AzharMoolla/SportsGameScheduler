@@ -1,16 +1,24 @@
-# Pre-launch gate — 2026-10-06
+# Pre-launch gate — 2026-10-07
+
+Latest evidence: [design and workflow audit](design-review/WORKFLOW-AUDIT.md). Local UI and deployed subscription checks improved; the full application is not publicly deployed and this gate is not complete.
 
 This is an initial conservative assessment of every Section 7 check. BLOCKED means evidence or implementation remains; it does not assert that a defect has already been confirmed. This is not certification or permission to deploy.
 
-Local evidence: lint passed, TypeScript passed, 99 unit tests passed and six focused desktop Chromium tests passed. Production compilation and SEO generation passed with `SILBO_SKIP_LIVE_DATA_VERIFY=1`; live data was deliberately not verified. The browser subset includes automated accessibility checks but does not prove full WCAG conformance. Live Supabase authorization, restored data, delivery and recovery are unverified.
+Local evidence: lint passed, TypeScript passed, 103 unit tests passed and core desktop route checks and ten desktop/mobile refresh checks passed. Production compilation and SEO generation passed with `SILBO_SKIP_LIVE_DATA_VERIFY=1`; strict live-data verification was run and failed baseball (21 upcoming versus 100 required) and Olympic detailed fixtures (zero). The browser subset includes automated accessibility checks but does not prove full WCAG conformance. Schema/configuration restored. Public REST reads and rollback-based ownership/share authorization tests passed; 2,426 public fixtures were rehydrated, while real login/deletion, delivery and recovery remain unverified.
 
-The original project was mothballed. The new Supabase project cannot currently be accessed; user dashboard and CLI both failed. Keep cron and external notifications disabled until restoration is verified.
+The original project was mothballed. The new Supabase connector and database now work. CLI secret access still fails for the saved login. External fan notifications remain disabled. On 2026-10-08 the user explicitly authorized recurring data hydration; bounded server-side jobs are now enabled after source, authorization and budget verification.
+
+2026-10-08 backend update: [hydration and backend review](data/hydration-backend-review-2026-10-08.md). 9,012 public fixtures / 7,231 upcoming; 41 public tables with RLS; ownership/share checks, lint, TypeScript, 117 unit tests and two viewing-country browser tests pass. Strict live-data gate still fails baseball (12 < 100) and Olympic detailed fixtures (0 < 1). Authenticated account lifecycle, notifications, complete recovery and public deployment evidence remain blockers. This update does not convert the general launch gate to PASS.
 
 ## Product truthfulness
 
+Fight-timing follow-up: [implementation and data limits](data/fight-timing-2026-10-08.md). 122 unit tests and desktop/mobile fight-timing tests pass. The model and foreground opt-in alerts are implemented; full real-card/live-history coverage, calibration and background delivery remain unavailable pending provider integration and delivery verification. Public claims must preserve those limits.
+
+2026-10-08 lifecycle follow-up: [event lifecycle](data/event-lifecycle-2026-10-08.md) records 48-hour completed-event listing, available final-score display, protected 90-day retention and active cleanup. 119 unit tests and two desktop/mobile lifecycle browser tests pass; rollback-only database retention checks pass. This does not resolve the remaining coverage, authenticated lifecycle, delivery or recovery blockers.
+
 | Check | Status | Evidence / remaining work |
 | --- | --- | --- |
-| Real product behavior matches landing-page claims. | BLOCKED | Database unavailable; static World Cup fallback can claim Live now after the tournament. Fix stale labels and verify real freshness. |
+| Real product behavior matches landing-page claims. | BLOCKED | 2,426 public events restored; stale World Cup live labels removed. Alerts and subscription behavior still require verification. |
 | No fake testimonial/logo/customer/metric/award/certification. | BLOCKED | Verify against the restored application before public release. |
 | AI claims have evidence and limitations are not hidden. | NOT APPLICABLE | No runtime AI feature or AI capability claim introduced. |
 | Concept/mockup material is not presented as shipped functionality. | BLOCKED | Verify against the restored application before public release. |
@@ -54,7 +62,7 @@ The original project was mothballed. The new Supabase project cannot currently b
 | Reduced motion is respected. | BLOCKED | Verify against the restored application before public release. |
 | Dialogs/menus/custom controls have appropriate semantics. | BLOCKED | Verify against the restored application before public release. |
 | Mobile, zoom/reflow, and loading/error/empty states have been tested. | BLOCKED | Verify against the restored application before public release. |
-| Automated accessibility checks completed plus manual spot checks. | BLOCKED | Six focused Chromium checks passed including automated home/schedule checks; manual keyboard/reflow checks still required. |
+| Automated accessibility checks completed plus manual spot checks. | BLOCKED | Desktop/mobile automated home/schedule checks and new keyboard/reflow checks passed. Visual spot checks performed at desktop and 390px. Automated contrast is excluded; full accessibility review remains. |
 
 ## Design quality
 
@@ -76,3 +84,11 @@ The original project was mothballed. The new Supabase project cannot currently b
 | Lockfile reviewed/updated intentionally. | NOT APPLICABLE | No application dependency, package installation or executable plugin hook introduced by this adoption. |
 | Executable plugin hooks/scripts were reviewed before trust/enablement. | NOT APPLICABLE | No application dependency, package installation or executable plugin hook introduced by this adoption. |
 | External AI/data providers are documented and approved. | BLOCKED | Verify against the restored application before public release. |
+
+## Refresh evidence
+
+See [design review](design-review/REFRESH.md) and [restoration status](RESTORE-STATUS.md). This gate remains BLOCKED for public launch: incomplete fixture coverage, unverified account/calendar/notification flows, recovery, retention and final product/legal review. The local design is reviewable and is not the public production release.
+
+## 2026-10-09 public beta release
+
+Owner authorized publication and Cloudflare deployment. Normal production build and revised seasonal live-data check pass; Olympics are optional while no active programme exists, and baseball's postseason minimum is one actual upcoming fixture rather than 100. Baseball near-term API-Sports hydration is now connected. Saved archives, accessible poster groups and unavailable Google sign-in were corrected. This supersedes the earlier coverage-only release blockers; the complete gate still has unverified account delivery/lifecycle, recovery and owner legal review. See [current release assessment](releases/2026-10-09.md).

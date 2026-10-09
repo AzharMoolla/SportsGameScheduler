@@ -4,11 +4,11 @@ import { useAppState } from '../app/state-context'
 import { cityLabelFor } from '../lib/cities'
 import { Button, Panel, PanelHeading } from '../components/ui'
 import { SignUpNudge } from '../components/SignUpNudge'
-import { filterMatchesForTeams, useMatches } from '../data/liveMatches'
-import { useMyEvents } from '../data/liveSport'
+import { usePersonalEvents as useMyEvents } from '../data/personalSchedule'
+import { eventToMatch } from '../lib/scheduleAdapter'
 import { brand, exportFilename } from '../domain/brand'
 import { copyToClipboard, downloadBlob } from '../lib/clipboard'
-import { createIcsBlob, createMultiSportIcsBlob } from '../lib/ics'
+import { createMultiSportIcsBlob } from '../lib/ics'
 import { t } from '../lib/i18n'
 import { createMultiSportNotesText, createNotesText } from '../lib/notes'
 import { MAX_EVENTS_BY_TEMPLATE, paginateEventsForPoster, type ExportTemplate } from '../lib/paginate'
@@ -27,7 +27,7 @@ const templates: Array<{ key: ExportTemplate; labelKey: string; hint: string }> 
 type ExportMode = 'static' | 'sync'
 
 export function ExportStudioPage() {
-  const { followedTeams, followedLeagueIds, followedCompetitorIds, prefs, surfaceMode } = useAppState()
+  const { followedTeams, followedLeagueIds, followedCompetitorIds, followedEventIds, prefs, surfaceMode } = useAppState()
   const [mode, setMode] = useState<ExportMode>('static')
   const [template, setTemplate] = useState<ExportTemplate>('poster')
   const [posterVariant, setPosterVariant] = useState<PosterVariant>(
@@ -37,12 +37,11 @@ export function ExportStudioPage() {
 
   const timeZone = prefs.timezone
   const cityLabel = cityLabelFor(prefs.timezone, prefs.city)
-  const { matches } = useMatches()
-  const schedule = useMemo(() => filterMatchesForTeams(matches, followedTeams), [matches, followedTeams])
-  const pages = useMemo(() => paginateEventsForPoster(schedule, template), [schedule, template])
 
   // Multi-sport calendar: all upcoming events from followed leagues + competitors, any sport.
-  const myEvents = useMyEvents(followedLeagueIds, followedCompetitorIds)
+  const myEvents = useMyEvents(followedLeagueIds, followedCompetitorIds, followedEventIds)
+  const schedule = useMemo(() => myEvents.events.filter(event => event.startsAt).map(eventToMatch), [myEvents.events])
+  const pages = useMemo(() => paginateEventsForPoster(schedule, template), [schedule, template])
 
   function exportAllSportsIcs() {
     downloadBlob(
@@ -90,7 +89,7 @@ export function ExportStudioPage() {
   }
 
   async function exportIcs() {
-    const blob = createIcsBlob(schedule, timeZone, prefs.locale, prefs.hour12)
+    const blob = createMultiSportIcsBlob(myEvents.events, { reminderMinutes: [60] })
     const file = new File([blob], exportFilename('schedule', 'ics'), { type: 'text/calendar' })
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({ title: brand.scheduleTitle, files: [file] })
@@ -251,10 +250,10 @@ export function ExportStudioPage() {
                 : t('export.saveImage', undefined, prefs.locale)}
             </Button>
             <Button className="w-full" variant="ghost" onClick={exportIcs} disabled={schedule.length === 0}>
-              <Download size={15} /> {t('export.downloadWorldCup', undefined, prefs.locale)}
+              <Download size={15} /> {'Download calendar ICS'}
             </Button>
             <Button className="w-full" variant="ghost" onClick={exportCsv} disabled={schedule.length === 0}>
-              <FileSpreadsheet size={15} /> Download World Cup CSV
+              <FileSpreadsheet size={15} /> Download schedule CSV
             </Button>
             <Button
               className="w-full"
@@ -304,7 +303,7 @@ export function ExportStudioPage() {
                     {formatTime(match.startsAt, timeZone, { locale: prefs.locale, hour12: prefs.hour12 ?? undefined })}
                   </span>
                   <span className="min-w-0 flex-1 text-sm font-semibold">
-                    {match.team1} vs {match.team2}
+                    {match.team1}{match.team2 ? ` vs ${match.team2}` : ''}
                   </span>
                   <span className="hidden truncate text-xs text-ink/50 sm:block">{match.ground}</span>
                 </div>

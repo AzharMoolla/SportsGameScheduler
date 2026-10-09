@@ -94,10 +94,10 @@ export function WatchProviderBadges({
               key={`${link.name}-${link.href}`}
               href={link.href}
               target="_blank"
-              rel={link.affiliate ? 'sponsored noopener noreferrer' : 'noopener noreferrer'}
-              title={`Watch on ${link.name}`}
+              rel="noopener noreferrer"
+              title={`${link.scope === 'event' ? 'Event listing' : 'Check coverage'} on ${link.name} for ${region}; local restrictions may apply`}
               onClick={(event) => event.stopPropagation()}
-              className={`inline-flex h-7 min-w-10 items-center justify-center rounded-md border px-2 font-mono text-[10px] font-black uppercase leading-none tracking-wide shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${style.className}`}
+              className={`watch-provider-badge inline-flex h-7 min-w-10 items-center justify-center rounded-md border px-2 font-mono text-[10px] font-black uppercase leading-none tracking-wide shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${style.className}`}
             >
               <span>{style.label}</span>
               <ExternalLink size={10} className="ml-1 opacity-70" aria-hidden="true" />

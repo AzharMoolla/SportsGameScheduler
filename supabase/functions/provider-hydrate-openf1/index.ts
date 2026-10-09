@@ -1,3 +1,4 @@
+import { authorizeMaintenance } from '../_shared/maintenance-auth.ts'
 // OpenF1 schedule/session hydrator.
 //
 // OpenF1 gives us F1 meetings and sessions with no key for historical/schedule data.
@@ -17,7 +18,7 @@ const PROVIDER_KEY = 'openf1'
 const SPORT_KEY = 'motorsport'
 const PROVIDER_LEAGUE_ID = 'f1'
 const BASE = Deno.env.get('OPENF1_BASE_URL') ?? 'https://api.openf1.org/v1'
-const CALL_BUDGET = Number(Deno.env.get('OPENF1_CALL_BUDGET') ?? 6)
+const CALL_BUDGET = Math.min(6, Math.max(1, Number(Deno.env.get('OPENF1_CALL_BUDGET') ?? 6) || 6))
 const CALL_SPACING_MS = Number(Deno.env.get('OPENF1_SPACING_MS') ?? 250)
 const EVENTS_TTL_MS = Number(Deno.env.get('OPENF1_EVENTS_TTL_HOURS') ?? 24) * 3600_000
 
@@ -264,7 +265,7 @@ async function upsertSessions(
     }
     const hash = await payloadHash({ title, status, startsAt, venueId, metadata })
     const linked = await findLinkedEvent(supabase, PROVIDER_KEY, externalId)
-    const candidate =
+    let candidate =
       linked ??
       (await findCandidateEvent(supabase, {
         sportId,
@@ -272,7 +273,9 @@ async function upsertSessions(
         venueId,
         title,
         startsAt,
-        windowHours: 14,
+        // F1 has several sessions at the same circuit each day. A broad window can
+        // merge practice, qualifying and the race. Link only coincident start times.
+        windowHours: 1 / 60,
         metadataNeedles: [
           session.session_name,
           session.session_type,
@@ -281,6 +284,16 @@ async function upsertSessions(
           meeting?.meeting_name,
         ],
       }))
+
+    // Preserve a provider permalink when repairing an earlier incorrect session link.
+    // Hidden superseded rows are otherwise excluded from cross-provider matching.
+    if (!candidate) {
+      const { data: own, error } = await supabase.from('events')
+        .select('id, title, status, starts_at, version, payload_hash, provider_key, provider_event_id, league_id, venue_id, metadata')
+        .eq('provider_key', PROVIDER_KEY).eq('provider_event_id', externalId).maybeSingle()
+      if (error) throw error
+      if (own) candidate = { ...own, matchConfidence: 100 }
+    }
 
     if (!candidate) {
       if (startsAt && new Date(startsAt).getTime() < Date.now() - 30 * 24 * 3600_000) continue
@@ -360,6 +373,7 @@ async function upsertSessions(
     if (candidate.provider_key === PROVIDER_KEY && candidate.payload_hash !== hash) {
       const visibleChange = candidate.title !== title || candidate.status !== status || candidate.starts_at !== startsAt
       const updatePayload: Record<string, unknown> = {
+        visibility: 'public',
         title,
         status,
         starts_at: startsAt,
@@ -389,6 +403,7 @@ async function upsertSessions(
       await supabase
         .from('events')
         .update({
+          ...(candidate.provider_key === PROVIDER_KEY ? { visibility: 'public' } : {}),
           last_checked_at: new Date().toISOString(),
           metadata: {
             ...(candidate.metadata ?? {}),
@@ -407,6 +422,9 @@ async function upsertSessions(
 }
 
 Deno.serve(async (req) => {
+  const rejected = await authorizeMaintenance(req, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (rejected) return rejected
+
   const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {}
   const force = body.force === true
   const seasonOverride =

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { WATCH_PROVIDERS, watchLinkFor } from '../lib/ads'
+import { WATCH_PROVIDERS, safeWatchUrl, watchLinkFor } from '../lib/watchProviders'
 import { getSupabaseClient } from '../lib/supabase'
 
 export type WatchOption = {
@@ -10,16 +10,16 @@ export type WatchOption = {
   network?: string
   source: 'db' | 'catalog' | 'fallback'
   priority: number
+  scope?: 'event' | 'league' | 'directory'
 }
 
 type ProviderRow = {
   key: string
   name: string
   network: string
-  affiliate_status: 'none' | 'pending' | 'approved' | 'paused' | 'rejected'
   direct_url: string
-  affiliate_url: string | null
   priority: number
+  is_active?: boolean
 }
 
 type WatchLinkRow = {
@@ -31,9 +31,10 @@ type WatchLinkRow = {
   sport_keys: string[]
   link_kind: 'official' | 'affiliate' | 'sponsored' | 'free'
   url: string | null
-  affiliate_url: string | null
   priority: number
   watch_providers: ProviderRow | null
+  starts_at?: string | null
+  ends_at?: string | null
 }
 
 type WatchQuery = {
@@ -45,7 +46,50 @@ type WatchQuery = {
   limit?: number
 }
 
-let watchLinkRowsPromise: Promise<WatchLinkRow[]> | null = null
+const watchRowsCache = new Map<string, { expiresAt: number; promise: Promise<WatchLinkRow[]> }>()
+const pendingEvents = new Map<string, { resolve: (rows: WatchLinkRow[]) => void; reject: (error: unknown) => void }>()
+let eventBatchScheduled = false
+const WATCH_FIELDS = 'provider_key, label, event_id, league_id, country_codes, sport_keys, link_kind, url, priority, starts_at, ends_at, watch_providers(key, name, network, direct_url, priority, is_active)'
+
+function cachedRows(key: string, fetchRows: () => Promise<WatchLinkRow[]>) {
+  const cached = watchRowsCache.get(key)
+  if (cached && cached.expiresAt > Date.now()) return cached.promise
+  const promise = fetchRows().catch(error => { watchRowsCache.delete(key); throw error })
+  if (watchRowsCache.size >= 150) watchRowsCache.delete(watchRowsCache.keys().next().value!)
+  watchRowsCache.set(key, { expiresAt: Date.now() + 5 * 60_000, promise })
+  return promise
+}
+
+function eventRows(eventId: string): Promise<WatchLinkRow[]> {
+  return cachedRows(`event:${eventId}`, () => new Promise((resolve, reject) => {
+    pendingEvents.set(eventId, { resolve, reject })
+    if (eventBatchScheduled) return
+    eventBatchScheduled = true
+    setTimeout(async () => {
+      eventBatchScheduled = false
+      const requests = new Map(pendingEvents)
+      pendingEvents.clear()
+      try {
+        const supabase = await getSupabaseClient()
+        if (!supabase) throw new Error('Watch data unavailable')
+        const ids = [...requests.keys()]
+        for (let i = 0; i < ids.length; i += 50) {
+          const group = ids.slice(i, i + 50)
+          const rows: WatchLinkRow[] = []
+          for (let offset = 0; ; offset += 1000) {
+            const { data, error } = await supabase.from('watch_links').select(WATCH_FIELDS)
+              .eq('is_active', true).in('event_id', group).order('id').range(offset, offset + 999)
+            if (error) throw error
+            const page = (data ?? []) as unknown as WatchLinkRow[]
+            rows.push(...page)
+            if (page.length < 1000) break
+          }
+          for (const id of group) requests.get(id)!.resolve(rows.filter(row => row.event_id === id))
+        }
+      } catch (error) { for (const request of requests.values()) request.reject(error) }
+    }, 0)
+  }))
+}
 
 type CatalogRule = {
   ruleKey: string
@@ -103,7 +147,10 @@ const CATALOG_RULES: CatalogRule[] = [
   { ruleKey: 'wc2026_nz_tvnz', providerKey: 'tvnz', label: 'TVNZ+', countryCodes: ['NZ'], sportKeys: ['soccer', 'world_cup'], leagueNamePattern: WORLD_CUP_2026, priority: 1 },
   { ruleKey: 'soccer_mls_global_apple', providerKey: 'apple_mls', label: 'MLS on Apple TV', countryCodes: ['US', 'CA', 'GB', 'AU'], sportKeys: ['soccer', 'mls'], leagueNamePattern: /\bmls\b|major league soccer/i, priority: 15 },
   { ruleKey: 'football_international_nfl_game_pass_dazn', providerKey: 'nfl_game_pass_dazn', label: 'NFL Game Pass on DAZN', countryCodes: ['CA', 'GB', 'DE', 'FR', 'IT', 'ES'], sportKeys: ['american_football', 'football', 'nfl'], leagueNamePattern: /\bnfl\b|national football league/i, priority: 18 },
-  { ruleKey: 'hockey_international_nhl_tv_dazn', providerKey: 'nhl_tv_dazn', label: 'NHL.TV on DAZN', countryCodes: ['GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'BE'], sportKeys: ['hockey'], leagueNamePattern: /\bnhl\b|national hockey league/i, priority: 18 },
+  { ruleKey: 'hockey_international_nhl_tv_dazn', providerKey: 'nhl_tv_dazn', label: 'NHL.TV on DAZN', countryCodes: ['GB', 'IE', 'DE', 'FR', 'AT'], sportKeys: ['hockey'], leagueNamePattern: /\bnhl\b|national hockey league/i, priority: 18 },
+  { ruleKey: 'nhl_current_broadcast_guide', providerKey: 'nhl_watch_guide', label: 'NHL broadcast guide', countryCodes: [], sportKeys: ['hockey'], leagueNamePattern: /\bnhl\b|national hockey league/i, priority: 19 },
+  { ruleKey: 'nba_current_broadcast_guide', providerKey: 'nba_watch_guide', label: 'NBA broadcast guide', countryCodes: [], sportKeys: ['basketball'], leagueNamePattern: /\bnba\b|national basketball/i, priority: 6 },
+  { ruleKey: 'ucl_current_broadcast_guide', providerKey: 'uefa_watch_guide', label: 'UEFA broadcast guide', countryCodes: [], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 6 },
   { ruleKey: 'cricket_us_ca_willow', providerKey: 'willow_tv', label: 'Willow TV', countryCodes: ['US', 'CA'], sportKeys: ['cricket'], priority: 10 },
   { ruleKey: 'table_tennis_wtt_live', providerKey: 'wtt_live', label: 'World Table Tennis', countryCodes: ['US', 'CA', 'GB', 'DE', 'FR', 'IT', 'ES'], sportKeys: ['table_tennis'], priority: 30 },
 
@@ -160,7 +207,7 @@ const CATALOG_RULES: CatalogRule[] = [
   { ruleKey: 'olympic_eu_discovery', providerKey: 'discovery_plus', label: 'Discovery+ / Eurosport', countryCodes: ['GB', 'IE', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'NO', 'DK', 'FI', 'PL'], sportKeys: ['olympic_sports', 'olympic'], leagueNamePattern: /olympic|paralympic/i, priority: 2 },
   { ruleKey: 'olympic_global_official', providerKey: 'olympics_com', label: 'Olympics.com', countryCodes: [], sportKeys: ['olympic_sports', 'olympic'], leagueNamePattern: /olympic|paralympic/i, priority: 9 },
   // Combat sports / UFC
-  { ruleKey: 'ufc_us_espn', providerKey: 'espn_plus', label: 'ESPN+', countryCodes: ['US'], sportKeys: ['combat_sports', 'combat', 'mma'], leagueNamePattern: /\bufc\b|ultimate fighting/i, priority: 1 },
+  { ruleKey: 'ufc_us_paramount', providerKey: 'paramount_plus', label: 'Paramount+', countryCodes: ['US'], sportKeys: ['combat_sports', 'combat', 'mma'], leagueNamePattern: /\bufc\b|ultimate fighting/i, priority: 1 },
   { ruleKey: 'ufc_global_fightpass', providerKey: 'ufc_fight_pass', label: 'UFC Fight Pass', countryCodes: [], sportKeys: ['combat_sports', 'combat', 'mma'], leagueNamePattern: /\bufc\b|ultimate fighting/i, priority: 3 },
   // Esports
   { ruleKey: 'esports_lol', providerKey: 'lolesports', label: 'LoL Esports', countryCodes: [], sportKeys: ['esports'], leagueNamePattern: /league of legends|\blol\b|mid-season invitational|\bmsi\b|worlds/i, priority: 1 },
@@ -187,9 +234,13 @@ const CATALOG_RULES: CatalogRule[] = [
   { ruleKey: 'ucl_us_paramount', providerKey: 'paramount_plus', label: 'Paramount+', countryCodes: ['US'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
   { ruleKey: 'ucl_us_tudn', providerKey: 'tudn', label: 'TUDN', countryCodes: ['US'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 2 },
   { ruleKey: 'ucl_ca_dazn', providerKey: 'dazn', label: 'DAZN', countryCodes: ['CA'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
-  { ruleKey: 'ucl_gb_tnt', providerKey: 'tnt_sports_uk', label: 'TNT Sports', countryCodes: ['GB', 'IE'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
+  { ruleKey: 'ucl_gb_tnt', providerKey: 'tnt_sports_uk', label: 'TNT Sports', countryCodes: ['GB'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
+  { ruleKey: 'ucl_gb_prime', providerKey: 'prime_video', label: 'Prime Video', countryCodes: ['GB'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 2 },
+  { ruleKey: 'ucl_ie_premier', providerKey: 'premier_sports', label: 'Premier Sports', countryCodes: ['IE'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
+  { ruleKey: 'ucl_ie_rte', providerKey: 'rte_player', label: 'RTE Player', countryCodes: ['IE'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 2 },
   { ruleKey: 'ucl_fr_canal', providerKey: 'canal_plus', label: 'CANAL+', countryCodes: ['FR'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
-  { ruleKey: 'ucl_de_dazn', providerKey: 'dazn', label: 'DAZN', countryCodes: ['DE', 'AT'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
+  { ruleKey: 'ucl_de_dazn', providerKey: 'dazn', label: 'DAZN', countryCodes: ['DE'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
+  { ruleKey: 'ucl_de_prime', providerKey: 'prime_video', label: 'Prime Video', countryCodes: ['DE'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 2 },
   { ruleKey: 'ucl_it_sky', providerKey: 'sky_it', label: 'Sky Italia', countryCodes: ['IT'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
   { ruleKey: 'ucl_it_prime', providerKey: 'prime_video', label: 'Prime Video', countryCodes: ['IT'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 2 },
   { ruleKey: 'ucl_es_movistar', providerKey: 'movistar_plus', label: 'Movistar Plus+', countryCodes: ['ES'], sportKeys: ['soccer'], leagueNamePattern: /uefa champions league|^champions league\b/i, priority: 1 },
@@ -209,13 +260,15 @@ const CATALOG_RULES: CatalogRule[] = [
   // Ligue 1
   { ruleKey: 'ligue1_ca_bein', providerKey: 'bein_sports', label: 'beIN SPORTS', countryCodes: ['CA'], sportKeys: ['soccer'], leagueNamePattern: /ligue 1/i, priority: 1 },
   { ruleKey: 'ligue1_us_bein', providerKey: 'bein_sports', label: 'beIN SPORTS', countryCodes: ['US'], sportKeys: ['soccer'], leagueNamePattern: /ligue 1/i, priority: 1 },
-  { ruleKey: 'ligue1_fr_canal', providerKey: 'canal_plus', label: 'CANAL+', countryCodes: ['FR'], sportKeys: ['soccer'], leagueNamePattern: /ligue 1/i, priority: 1 },
+  { ruleKey: 'ligue1_fr_plus', providerKey: 'ligue1_plus', label: 'Ligue 1+', countryCodes: ['FR'], sportKeys: ['soccer'], leagueNamePattern: /ligue 1/i, priority: 1 },
 
   // --- Major multi-sport routes (docs "Major Multi-Sport Watch Routes").
   // NBA
   { ruleKey: 'nba_global_leaguepass', providerKey: 'nba_league_pass', label: 'NBA League Pass', countryCodes: ['US', 'CA', 'GB', 'AU', 'IN'], sportKeys: ['basketball'], leagueNamePattern: /\bnba\b|national basketball/i, priority: 4 },
   { ruleKey: 'nba_us_prime', providerKey: 'prime_video', label: 'Prime Video', countryCodes: ['US'], sportKeys: ['basketball'], leagueNamePattern: /\bnba\b|national basketball/i, priority: 2 },
-  { ruleKey: 'nba_us_espn', providerKey: 'espn_plus', label: 'ESPN', countryCodes: ['US'], sportKeys: ['basketball'], leagueNamePattern: /\bnba\b|national basketball/i, priority: 3 },
+  { ruleKey: 'nba_us_espn', providerKey: 'espn_watch', label: 'ABC / ESPN', countryCodes: ['US'], sportKeys: ['basketball'], leagueNamePattern: /\bnba\b|national basketball/i, priority: 3 },
+  { ruleKey: 'nba_us_nbc', providerKey: 'nbc_sports', label: 'NBC Sports', countryCodes: ['US'], sportKeys: ['basketball'], leagueNamePattern: /\bnba\b|national basketball/i, priority: 1 },
+  { ruleKey: 'nba_us_peacock', providerKey: 'peacock', label: 'Peacock', countryCodes: ['US'], sportKeys: ['basketball'], leagueNamePattern: /\bnba\b|national basketball/i, priority: 2 },
   // MLB
   { ruleKey: 'mlb_global_mlbtv', providerKey: 'mlb_tv', label: 'MLB.TV', countryCodes: ['US', 'CA', 'GB', 'AU', 'JP'], sportKeys: ['baseball'], leagueNamePattern: /\bmlb\b|major league baseball/i, priority: 4 },
   // Formula 1 (US is Apple TV from 2026; canonical country/broadcaster table on formula1.com)
@@ -278,6 +331,7 @@ function catalogWatchOptions(query: WatchQuery, limit: number): WatchOption[] {
         network: undefined,
         source: 'catalog' as const,
         priority: rule.priority,
+        scope: 'league' as const,
       }]
     })
     .filter((option) => {
@@ -299,8 +353,8 @@ export function fallbackWatchOptions(regionCode?: string | null, sportKey?: stri
       p.regions.includes(region) &&
       includesSportOrGlobal(p.sports, sportKey),
   )
-  const regional = WATCH_PROVIDERS.filter((p) => p.regions.includes(region))
-  const providers = (exact.length ? exact : regional.length ? regional : WATCH_PROVIDERS).slice(0, limit)
+  const global = WATCH_PROVIDERS.filter(p => !p.regions.length && includesSportOrGlobal(p.sports, sportKey))
+  const providers = (exact.length ? exact : global).slice(0, limit)
 
   return providers.flatMap((provider, index) => {
     const link = watchLinkFor(provider.key)
@@ -310,14 +364,15 @@ export function fallbackWatchOptions(regionCode?: string | null, sportKey?: stri
       name: link.name,
       href: link.href,
       affiliate: link.affiliate,
-      network: provider.network,
+      network: undefined,
       source: 'fallback' as const,
       priority: index + 100,
+      scope: 'directory' as const,
     }]
   })
 }
 
-function mapRows(rows: WatchLinkRow[], query: WatchQuery): WatchOption[] {
+export function mapWatchRows(rows: WatchLinkRow[], query: WatchQuery): WatchOption[] {
   const region = (query.regionCode ?? 'US').toUpperCase()
   const leagueName = query.leagueName?.trim() ?? ''
   const wantsWorldCup = WORLD_CUP_2026.test(leagueName)
@@ -325,7 +380,9 @@ function mapRows(rows: WatchLinkRow[], query: WatchQuery): WatchOption[] {
 
   return rows
     .filter((row) => {
-      if (!row.watch_providers) return false
+      if (!row.watch_providers || row.watch_providers.is_active === false) return false
+      if (row.starts_at && Date.parse(row.starts_at) > Date.now()) return false
+      if (row.ends_at && Date.parse(row.ends_at) <= Date.now()) return false
       if (row.event_id && row.event_id !== query.eventId) return false
       if (row.league_id && row.league_id !== query.leagueId) {
         const isWorldCupLeague = wantsWorldCup && row.sport_keys.includes('world_cup')
@@ -336,24 +393,25 @@ function mapRows(rows: WatchLinkRow[], query: WatchQuery): WatchOption[] {
       if (wantsWorldCup && !row.event_id && !row.sport_keys.includes('world_cup')) return false
       return true
     })
-    .map((row) => {
+    .flatMap((row) => {
       const provider = row.watch_providers!
-      const affiliateHref =
-        provider.affiliate_status === 'approved'
-          ? row.affiliate_url ?? provider.affiliate_url
-          : null
-      const href = affiliateHref ?? row.url ?? provider.direct_url
+      // Old paid rows may contain tracking URLs; use the provider's direct destination.
+      const href = safeWatchUrl(row.link_kind === 'affiliate' || row.link_kind === 'sponsored'
+        ? provider.direct_url
+        : row.url ?? provider.direct_url)
+      if (!href) return []
       const exactBoost = row.event_id ? -1000 : row.league_id ? -500 : 0
-      const affiliate = Boolean(affiliateHref) || row.link_kind === 'affiliate' || row.link_kind === 'sponsored'
-      return {
+      const affiliate = false
+      return [{
         key: `${row.provider_key}:${href}`,
         name: row.label ?? provider.name,
         href,
         affiliate,
-        network: provider.network,
+        network: undefined,
         source: 'db' as const,
-        priority: row.priority + provider.priority + exactBoost + (affiliate ? -10 : 0),
-      }
+        priority: row.priority + provider.priority + exactBoost,
+        scope: row.event_id ? 'event' as const : row.league_id ? 'league' as const : 'directory' as const,
+      }]
     })
     .sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name))
     .filter((option) => {
@@ -364,30 +422,29 @@ function mapRows(rows: WatchLinkRow[], query: WatchQuery): WatchOption[] {
     })
 }
 
-async function loadWatchLinkRows(): Promise<{ rows: WatchLinkRow[]; configured: boolean }> {
+async function loadWatchLinkRows(query: WatchQuery): Promise<{ rows: WatchLinkRow[]; configured: boolean }> {
   const supabase = await getSupabaseClient()
   if (!supabase) return { rows: [], configured: false }
 
-  if (!watchLinkRowsPromise) {
-    watchLinkRowsPromise = Promise.resolve(
-      supabase
-        .from('watch_links')
-        .select(
-          'provider_key, label, event_id, league_id, country_codes, sport_keys, link_kind, url, affiliate_url, priority, watch_providers(key, name, network, affiliate_status, direct_url, affiliate_url, priority)',
-        )
-        .eq('is_active', true)
-        .order('priority', { ascending: true })
-        .limit(100),
-    ).then(({ data, error }) => {
-      if (error) throw error
-      return (data ?? []) as unknown as WatchLinkRow[]
-    })
-  }
-
   try {
-    return { rows: await watchLinkRowsPromise, configured: true }
+    // Share league/directory data across cards, and batch event-specific reads.
+    // A growing TV feed must not truncate the exact event behind a global limit.
+    const common = cachedRows('common', async () => {
+      const rows: WatchLinkRow[] = []
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase.from('watch_links').select(WATCH_FIELDS)
+          .eq('is_active', true).is('event_id', null).order('id').range(offset, offset + 999)
+        if (error) throw error
+        const page = (data ?? []) as unknown as WatchLinkRow[]
+        rows.push(...page)
+        if (page.length < 1000) break
+      }
+      return rows
+    })
+    const exact = query.eventId && /^[0-9a-f-]{36}$/i.test(query.eventId) ? eventRows(query.eventId) : Promise.resolve([])
+    const [commons, events] = await Promise.all([common, exact])
+    return { rows: [...commons, ...events], configured: true }
   } catch {
-    watchLinkRowsPromise = null
     return { rows: [], configured: true }
   }
 }
@@ -411,9 +468,12 @@ export function useWatchOptions(query: WatchQuery): { links: WatchOption[]; load
 
   useEffect(() => {
     let cancelled = false
-    loadWatchLinkRows().then(({ rows, configured }) => {
+    loadWatchLinkRows(query).then(({ rows, configured }) => {
       if (cancelled) return
-      const links = mapRows(rows, query).slice(0, limit)
+      // League-specific routes take precedence over old sport-wide broadcaster rows.
+      const scopedRows = rows.filter(row => (row.event_id === query.eventId && Boolean(row.event_id)) || (row.league_id === query.leagueId && Boolean(row.league_id)))
+      const scopedLinks = mapWatchRows(scopedRows, query).slice(0, limit)
+      const links = scopedLinks.length ? scopedLinks : query.leagueName ? fallback : mapWatchRows(rows, query).slice(0, limit)
       setState({ key, links: links.length ? links : fallback, configured })
     })
     return () => {

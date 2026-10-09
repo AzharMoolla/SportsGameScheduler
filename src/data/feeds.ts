@@ -55,11 +55,12 @@ function rowToFeed(row: FeedRow, hashToToken: Map<string, string>): CalendarFeed
 }
 
 export async function loadRemoteFeeds(supabase: SupabaseClient, userId: string): Promise<CalendarFeed[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('calendar_feeds')
     .select('id, name, timezone, filters, is_active, include_placeholders, include_broadcasts, created_at, token_hash')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
+  if (error) throw error
   const hashToToken = await localHashToToken()
   return ((data ?? []) as FeedRow[]).map((row) => rowToFeed(row, hashToToken))
 }
@@ -72,10 +73,11 @@ export async function mergeFeedsOnSignIn(
   userId: string,
   localFeeds: CalendarFeed[],
 ): Promise<CalendarFeed[]> {
-  const { data: existing } = await supabase
+  const { data: existing, error } = await supabase
     .from('calendar_feeds')
     .select('token_hash')
     .eq('user_id', userId)
+  if (error) throw error
   const ownedHashes = new Set(((existing ?? []) as { token_hash: string | null }[]).map((r) => r.token_hash))
 
   const toClaim = await Promise.all(
@@ -96,7 +98,10 @@ export async function mergeFeedsOnSignIn(
       is_active: feed.isActive,
     }))
 
-  if (rows.length) await supabase.from('calendar_feeds').insert(rows)
+  if (rows.length) {
+    const { error } = await supabase.from('calendar_feeds').insert(rows)
+    if (error) throw error
+  }
 
   return loadRemoteFeeds(supabase, userId)
 }

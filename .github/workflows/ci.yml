@@ -1,18 +1,19 @@
 name: CI
 
-# MOTHBALLED (2026-07): push/PR triggers disabled so no Actions minutes are consumed while the
-# project is parked. Run manually from the Actions tab if you need a build check.
-# TO RE-ENABLE: uncomment the `push:` and `pull_request:` blocks below.
+# Resumed with the restored site. Hydration timers remain in Supabase, not Actions.
 on:
-  # push:
-  #   branches: [main]
-  # pull_request:
-  #   branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: https://bgbkqxdsjnbsizwkslsr.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_xGx8_YsoZZBCkbMrREPGug_39_9atJA
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,5 +24,5 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --project=desktop-chromium
+      - run: npm run test:e2e -- --project=desktop-chromium --workers=3
       - run: npm run build

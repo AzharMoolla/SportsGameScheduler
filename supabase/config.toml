@@ -2,7 +2,7 @@
 # calendar clients (Google/Apple/Outlook) send NO auth headers, the unguessable token in the
 # URL is the authorization. Deploying it without this file (or without --no-verify-jwt) flips
 # verify_jwt back to true and 401s every subscriber's feed.
-project_id = "gcnbgdpicgeahxscpsfc"
+project_id = "bgbkqxdsjnbsizwkslsr"
 
 [functions.calendar-feed]
 verify_jwt = false

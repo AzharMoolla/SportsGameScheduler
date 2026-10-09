@@ -8,12 +8,13 @@
 // Same guarantees as the event hydrator: key from secret, paced + budgeted, 429-safe,
 // idempotent (upsert on provider IDs).
 
+import { authorizeMaintenance } from '../_shared/maintenance-auth.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const API_KEY = Deno.env.get('THESPORTSDB_API_KEY') ?? ''
 const BASE = `https://www.thesportsdb.com/api/v1/json/${API_KEY}`
-const CALL_BUDGET = Number(Deno.env.get('PLAYERS_CALL_BUDGET') ?? 50)
-const CALL_SPACING_MS = Number(Deno.env.get('PLAYERS_SPACING_MS') ?? 750)
+const CALL_BUDGET = Math.min(10, Math.max(1, Number(Deno.env.get('PLAYERS_CALL_BUDGET') ?? 10) || 10))
+const CALL_SPACING_MS = Math.max(2100, Number(Deno.env.get('PLAYERS_SPACING_MS') ?? 2100) || 2100)
 const ROSTER_TTL_MS = 30 * 24 * 3600_000
 
 const INDIVIDUAL_SPORTS = ['tennis', 'golf', 'athletics', 'combat_sports']
@@ -27,13 +28,18 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 type Player = Record<string, string | null>
 type Group = { id: string; provider_competitor_id: string; sport_id: string; league_id: string | null }
 
-Deno.serve(async () => {
+Deno.serve(async request => {
+  const rejected = await authorizeMaintenance(request, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (rejected) return rejected
+  const body = await request.json().catch(()=>({})) as { sportKeys?: string[] }
+  const requestedSports = Array.isArray(body.sportKeys) ? body.sportKeys.filter(key=>INDIVIDUAL_SPORTS.includes(key)) : INDIVIDUAL_SPORTS
+  if (!requestedSports.length) return Response.json({error:'Unsupported sports'}, {status:400})
   if (!API_KEY) return Response.json({ ok: false, error: 'THESPORTSDB_API_KEY not configured' }, { status: 500 })
 
-  const counters = { calls: 0, groups: 0, players: 0 }
+  const counters = { calls: 0, groups: 0, players: 0, failed: 0 }
   const staleBefore = new Date(Date.now() - ROSTER_TTL_MS).toISOString()
 
-  const { data: sportRows } = await supabase.from('sports').select('id').in('key', INDIVIDUAL_SPORTS)
+  const { data: sportRows } = await supabase.from('sports').select('id').in('key', requestedSports)
   const sportIds = (sportRows ?? []).map((s) => s.id)
 
   const { data: run } = await supabase
@@ -87,9 +93,8 @@ Deno.serve(async () => {
               parent_competitor_id: group.id,
             }))
           for (let i = 0; i < payload.length; i += 200) {
-            await supabase
-              .from('competitors')
-              .upsert(payload.slice(i, i + 200), { onConflict: 'provider_key,provider_competitor_id' })
+            const {error} = await supabase.from('competitors').upsert(payload.slice(i, i + 200), { onConflict: 'provider_key,provider_competitor_id' })
+            if (error) throw error
           }
           counters.players += payload.length
         }
@@ -100,8 +105,8 @@ Deno.serve(async () => {
           stopped = 'rate_limited'
           break
         }
-        // A single bad group must not abort the batch; mark it synced so we don't loop on it.
-        await supabase.from('competitors').update({ players_synced_at: new Date().toISOString() }).eq('id', group.id)
+        counters.failed += 1
+        // Leave failed groups stale so a later bounded run can retry them.
       }
     }
   } catch (error) {
@@ -115,10 +120,10 @@ Deno.serve(async () => {
   await supabase
     .from('provider_sync_runs')
     .update({
-      status: 'success',
+      status: counters.failed ? 'failed' : 'success',
       fetched_count: counters.groups,
       changed_count: counters.players,
-      error: stopped === 'done' ? null : `stopped: ${stopped}`,
+      error: counters.failed ? `${counters.failed} roster groups failed` : stopped === 'done' ? null : `stopped: ${stopped}`,
       finished_at: new Date().toISOString(),
     })
     .eq('id', run!.id)

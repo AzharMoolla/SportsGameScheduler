@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const smokeRoutes = [
-  { path: '/', landmark: /one schedule for every sport you follow/i },
+  { path: '/', landmark: /your sports\.\s*your time/i },
   { path: '/my-schedule', landmark: /my schedule|world cup schedule/i },
   { path: '/exports', landmark: /silbo exports|live sync|static packs/i },
   { path: '/custom-leagues', landmark: /community schedules|create a league/i },
@@ -118,7 +118,7 @@ test.describe('match card interactions', () => {
     await expect(firstDetailsToggle).toBeVisible()
     await firstDetailsToggle.click()
 
-    await expect(page.getByText(/match details/i).first()).toBeVisible()
+    await expect(page.getByText(/quick details/i).first()).toBeVisible()
     await expect(page.getByText(/where to watch/i).first()).toBeVisible()
   })
 })
@@ -161,15 +161,10 @@ test.describe('adaptive presentation', () => {
     await page.emulateMedia({ colorScheme: 'light' })
     await page.goto('/')
 
-    const worldCupCta = page.getByRole('button', { name: 'Soccer: World Cup', exact: true })
-    await worldCupCta.hover()
-    expect(await renderedContrast(worldCupCta)).toBeGreaterThanOrEqual(4.5)
+    const browseCta = page.getByRole('link', { name: 'Browse sports', exact: true })
+    await browseCta.hover()
+    expect(await renderedContrast(browseCta)).toBeGreaterThanOrEqual(4.5)
 
-    const homepageIconLinks = page.locator('.silbo-opaque-primary-hover')
-    expect(await homepageIconLinks.count()).toBeGreaterThan(0)
-    const homepageIconLink = homepageIconLinks.first()
-    await homepageIconLink.hover()
-    expect(await renderedContrast(homepageIconLink)).toBeGreaterThanOrEqual(3)
   })
 
   test('desktop homepage artwork stays edge-anchored and spans ultrawide gutters', async ({ page }, testInfo) => {
@@ -223,7 +218,7 @@ test.describe('adaptive presentation', () => {
     test.skip(testInfo.project.name !== 'desktop-chromium', 'desktop scroll-motion regression')
 
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: /one schedule for every sport you follow/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /your sports\.\s*your time/i })).toBeVisible()
     const legLength = await page.evaluate(() => Math.max(1200, window.innerHeight * 1.75))
     await expect
       .poll(() =>

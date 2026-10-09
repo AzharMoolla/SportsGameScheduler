@@ -1,3 +1,6 @@
+import { scheduleVisibilityFilter } from '../lib/eventLifecycle'
+import { fightDiscipline, type FightHistory } from '../lib/fightTiming'
+import { approvedSportsImage } from '../lib/mediaRights'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
 import { getSupabaseClient } from '../lib/supabase'
@@ -129,7 +132,7 @@ async function loadEventParticipants(supabase: SupabaseClient, eventIds: string[
       country: row.competitors.country,
       kind: row.competitors.kind,
       role: row.role,
-      logoUrl: row.competitors.logo_url,
+      logoUrl: approvedSportsImage(row.competitors.logo_url, row.competitors.name),
     })
     eventCompetitors.set(row.event_id, current)
   }
@@ -161,7 +164,7 @@ export function useSportSchedule(canonicalSportKey: string): SportSchedule {
         return
       }
 
-      const nowIso = new Date(Date.now() - 3 * 3600_000).toISOString()
+      const visibilityFilter = scheduleVisibilityFilter()
       let leaguesData: Array<{ id: string; name: string; logo_url: string | null }> | null = null
       let eventRows: EventRow[] | null = null
       let leaguesReadFailed = false
@@ -188,7 +191,7 @@ export function useSportSchedule(canonicalSportKey: string): SportSchedule {
             )
             .eq('sports.key', canonicalSportKey)
             .eq('visibility', 'public')
-            .gte('starts_at', nowIso)
+            .or(visibilityFilter)
             .order('starts_at', { ascending: true })
             .limit(250),
         )) as EventRow[] | null
@@ -207,7 +210,7 @@ export function useSportSchedule(canonicalSportKey: string): SportSchedule {
         : (leaguesData ?? [])
       const allLeagues: LiveLeague[] = baseLeagues
         .filter((l) => isPublicLeagueName(l.name))
-        .map((l) => ({ id: l.id, name: l.name.trim(), logoUrl: l.logo_url }))
+        .map((l) => ({ id: l.id, name: l.name.trim(), logoUrl: approvedSportsImage(l.logo_url)}))
       const leagueNames = new Map(allLeagues.map((l) => [l.id, l.name]))
       const leagueLogos = new Map(allLeagues.map((l) => [l.id, l.logoUrl]))
       const visibleLeagueIds = new Set(leagueNames.keys())
@@ -248,7 +251,7 @@ export function useSportSchedule(canonicalSportKey: string): SportSchedule {
       const leagueIdsAlreadyListed = new Set(allLeagues.map((league) => league.id))
       const derivedLeagues: LiveLeague[] = [...leagueNames.entries()]
         .filter(([id]) => !leagueIdsAlreadyListed.has(id))
-        .map(([id, name]) => ({ id, name, logoUrl: leagueLogos.get(id) ?? null }))
+        .map(([id, name]) => ({ id, name, logoUrl: approvedSportsImage(leagueLogos.get(id) ?? null)}))
       const leagues = [...allLeagues, ...derivedLeagues]
 
       // Keep the full public league catalogue visible. The UI separates leagues with fixtures
@@ -288,6 +291,8 @@ export function useSportSchedule(canonicalSportKey: string): SportSchedule {
 }
 
 type MyEventRow = {
+  updated_at: string
+  version: number
   id: string
   title: string
   starts_at: string | null
@@ -302,7 +307,7 @@ type MyEventRow = {
 }
 
 const MY_EVENT_SELECT =
-  'id, title, starts_at, starts_at_tbd, status, kind, metadata, league_id, venues(name), sports(key), leagues(name)'
+  'id, title, starts_at, starts_at_tbd, updated_at, version, status, kind, metadata, league_id, venues(name), sports(key), leagues(name)'
 
 function mapMyEvent(row: MyEventRow): LiveEvent {
   return {
@@ -312,7 +317,7 @@ function mapMyEvent(row: MyEventRow): LiveEvent {
     startsAtTbd: row.starts_at_tbd,
     status: row.status,
     kind: row.kind,
-    metadata: row.metadata ?? {},
+    metadata: { ...row.metadata, updated_at: row.updated_at, version: row.version },
     leagueId: row.league_id,
     leagueName: publicLeagueName(row.leagues?.name),
     sportKey: row.sports?.key ?? null,
@@ -326,15 +331,17 @@ function mapMyEvent(row: MyEventRow): LiveEvent {
 export function useMyEvents(
   leagueIds: string[],
   competitorIds: string[],
-): { events: LiveEvent[]; loading: boolean; configured: boolean } {
+  savedEventIds: string[] = [],
+): { events: LiveEvent[]; loading: boolean; configured: boolean; error?: string } {
   const leagueKey = [...leagueIds].sort().join(',')
   const competitorKey = [...competitorIds].sort().join(',')
-  const [state, setState] = useState<{ forKey: string; events: LiveEvent[]; configured: boolean }>({
+  const [state, setState] = useState<{ forKey: string; events: LiveEvent[]; configured: boolean; error?: string }>({
     forKey: 'init',
     events: [],
     configured: true,
   })
-  const queryKey = `${leagueKey}|${competitorKey}`
+  const eventKey = [...savedEventIds].sort().join(',')
+  const queryKey = `${leagueKey}|${competitorKey}|${eventKey}`
 
   useEffect(() => {
     let cancelled = false
@@ -342,7 +349,7 @@ export function useMyEvents(
     getSupabaseClient().then(async (supabase) => {
       if (cancelled) return
       // No follows yet: resolve to an empty schedule (async, never a synchronous setState).
-      if (!leagueIds.length && !competitorIds.length) {
+      if (!leagueIds.length && !competitorIds.length && !savedEventIds.length) {
         setState({ forKey: queryKey, events: [], configured: true })
         return
       }
@@ -350,10 +357,15 @@ export function useMyEvents(
         setState({ forKey: queryKey, events: [], configured: false })
         return
       }
-      const nowIso = new Date(Date.now() - 3 * 3600_000).toISOString()
+      const visibilityFilter = scheduleVisibilityFilter()
       const byId = new Map<string, LiveEvent>()
 
       try {
+        if (savedEventIds.length) {
+          // Explicit saves remain accessible as archive records after ordinary listings expire.
+          const rows = await retryRead(() => supabase.from('events').select(MY_EVENT_SELECT).in('id', savedEventIds).eq('visibility', 'public').order('starts_at')) as unknown as MyEventRow[] | null
+          for (const row of rows ?? []) byId.set(row.id, mapMyEvent(row))
+        }
         if (leagueIds.length) {
           const data = (await retryRead(() =>
             supabase
@@ -361,8 +373,8 @@ export function useMyEvents(
               .select(MY_EVENT_SELECT)
               .in('league_id', leagueIds)
               .eq('visibility', 'public')
-              .neq('status', 'finished')
-              .gte('starts_at', nowIso)
+
+              .or(visibilityFilter)
               .order('starts_at', { ascending: true })
               .limit(300),
           )) as unknown as MyEventRow[] | null
@@ -381,8 +393,8 @@ export function useMyEvents(
                 .select(MY_EVENT_SELECT)
                 .in('id', eventIds.slice(i, i + 200))
                 .eq('visibility', 'public')
-                .neq('status', 'finished')
-                .gte('starts_at', nowIso)
+
+                .or(visibilityFilter)
                 .order('starts_at', { ascending: true }),
             )) as unknown as MyEventRow[] | null
             for (const row of data ?? []) byId.set(row.id, mapMyEvent(row))
@@ -391,6 +403,7 @@ export function useMyEvents(
       } catch {
         // Every retry failed — leave the previously loaded schedule on screen rather than wiping
         // it to empty. The next follow change or revisit re-runs this effect.
+        if (!cancelled) setState(previous => ({ ...previous, forKey: queryKey, error: 'Could not refresh sports events. Reopen this page to retry.' }))
         return
       }
 
@@ -419,7 +432,7 @@ export function useMyEvents(
   }, [queryKey])
 
   const loading = state.forKey !== queryKey
-  return { events: loading ? [] : state.events, loading, configured: state.configured }
+  return { events: loading ? [] : state.events, loading, configured: state.configured, error: state.error }
 }
 
 export type EventCompetitor = { id: string; name: string; country: string | null; kind: string | null; role: string; logoUrl: string | null }
@@ -437,6 +450,7 @@ export type EventBout = {
   blueCorner: EventCompetitor | null
 }
 export type EventDetail = LiveEvent & {
+  fighterHistory?: Record<string, FightHistory[]>
   leagueId: string | null
   venueCity: string | null
   venueCountry: string | null
@@ -448,12 +462,19 @@ export type EventDetail = LiveEvent & {
 }
 
 // Full single-event read for the event detail page (the target of calendar "View" links).
-export function useEvent(eventId: string | undefined): { event: EventDetail | null; loading: boolean; configured: boolean } {
+export function useEvent(eventId: string | undefined, liveUpdates = false): { event: EventDetail | null; loading: boolean; configured: boolean } {
+  const [revision, setRevision] = useState(0)
   const [state, setState] = useState<{ forKey: string; event: EventDetail | null; configured: boolean }>({
     forKey: 'init',
     event: null,
     configured: true,
   })
+  const shouldPoll = liveUpdates && state.event?.sportKey === 'combat_sports' && state.event.status !== 'finished'
+  useEffect(() => {
+    if (!shouldPoll || !eventId) return
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') setRevision(value => value + 1) }, 30_000)
+    return () => clearInterval(timer)
+  }, [eventId, shouldPoll])
 
   useEffect(() => {
     let cancelled = false
@@ -482,7 +503,7 @@ export function useEvent(eventId: string | undefined): { event: EventDetail | nu
           .select('role, position, competitors(id, name, country, kind, logo_url)')
           .eq('event_id', eventId)
           .order('position', { ascending: true }),
-        supabase.from('broadcasts').select('country, channel, stream_url, kind').eq('event_id', eventId),
+        supabase.from('broadcasts').select('country, channel, stream_url, kind, source_key, last_checked_at').eq('event_id', eventId),
         supabase
           .from('event_bouts')
           .select(
@@ -516,7 +537,7 @@ export function useEvent(eventId: string | undefined): { event: EventDetail | nu
           name: person.name,
           country: person.country,
           kind: person.kind,
-          logoUrl: person.logo_url,
+          logoUrl: approvedSportsImage(person.logo_url, person.name),
           role: (c as unknown as { role: string }).role,
         }
       })
@@ -546,7 +567,7 @@ export function useEvent(eventId: string | undefined): { event: EventDetail | nu
         boutCompetitors = new Map(
           ((people ?? []) as unknown as Array<{ id: string; name: string; country: string | null; logo_url: string | null }>).map((person) => [
           person.id,
-            { id: person.id, name: person.name, country: person.country, kind: 'person', logoUrl: person.logo_url, role: 'fighter' },
+            { id: person.id, name: person.name, country: person.country, kind: 'person', logoUrl: approvedSportsImage(person.logo_url, person.name), role: 'fighter' },
           ]),
         )
       }
@@ -565,7 +586,22 @@ export function useEvent(eventId: string | undefined): { event: EventDetail | nu
           blueCorner: bout.blue_corner_competitor_id ? boutCompetitors.get(bout.blue_corner_competitor_id) ?? null : null,
         }
       })
-      const broadcasts: EventBroadcast[] = (casts ?? []).map((b) => ({
+      const fighterHistory: Record<string, FightHistory[]> = {}
+      if (boutCompetitorIds.length) {
+        const { data } = await supabase.rpc('fight_timing_history', { fighter_ids: boutCompetitorIds.slice(0,40) })
+        for (const past of data ?? []) {
+          const result = past.result ?? {}
+          const roundSeconds = Number(past.metadata?.round_seconds ?? (fightDiscipline(r.leagues?.name ?? '',r.metadata ?? undefined) === 'boxing' ? 180 : 300))
+          const history: FightHistory = { scheduledRounds: Number(past.scheduled_rounds), roundSeconds,
+            durationSeconds: typeof result.duration_seconds === 'number' ? result.duration_seconds : undefined,
+            roundsFought: typeof result.rounds_fought === 'number' ? result.rounds_fought : typeof result.finish_round === 'number' ? result.finish_round : undefined,
+            method: typeof result.method === 'string' ? result.method : undefined }
+          ;(fighterHistory[past.fighter_id] ??= []).push(history)
+        }
+      }
+      if (cancelled) return
+      const broadcasts: EventBroadcast[] = (casts ?? []).filter(b => b.source_key !== 'thesportsdb' ||
+        (b.last_checked_at && Date.parse(b.last_checked_at) >= Date.now() - 48 * 3600_000)).map((b) => ({
         country: (b as unknown as { country: string }).country,
         channel: (b as unknown as { channel: string }).channel,
         streamUrl: (b as unknown as { stream_url: string | null }).stream_url,
@@ -590,6 +626,7 @@ export function useEvent(eventId: string | undefined): { event: EventDetail | nu
           venueCountry: r.venues?.country ?? null,
           competitors,
           bouts,
+          fighterHistory,
           broadcasts,
         },
       })
@@ -598,7 +635,7 @@ export function useEvent(eventId: string | undefined): { event: EventDetail | nu
     return () => {
       cancelled = true
     }
-  }, [eventId])
+  }, [eventId, revision])
 
   const loading = state.forKey !== (eventId ?? '')
   return { event: loading ? null : state.event, loading, configured: state.configured }
@@ -642,7 +679,7 @@ export function useLeague(leagueId: string | undefined): {
         setState({ forKey: key, league: null, events: [], configured: false })
         return
       }
-      const nowIso = new Date(Date.now() - 3 * 3600_000).toISOString()
+      const visibilityFilter = scheduleVisibilityFilter()
       const [{ data: leagueRow }, { data: eventRows }] = await Promise.all([
         supabase.from('leagues').select('id, name, country, logo_url, is_public, sports(key)').eq('id', leagueId).eq('is_public', true).maybeSingle(),
         supabase
@@ -650,8 +687,8 @@ export function useLeague(leagueId: string | undefined): {
           .select(MY_EVENT_SELECT)
           .eq('league_id', leagueId)
           .eq('visibility', 'public')
-          .neq('status', 'finished')
-          .gte('starts_at', nowIso)
+
+          .or(visibilityFilter)
           .order('starts_at', { ascending: true })
           .limit(200),
       ])
@@ -668,7 +705,7 @@ export function useLeague(leagueId: string | undefined): {
       setState({
         forKey: key,
         configured: true,
-        league: { id: r.id, name: r.name.trim(), sportKey: r.sports?.key ?? null, country: r.country, logoUrl: r.logo_url },
+        league: { id: r.id, name: r.name.trim(), sportKey: r.sports?.key ?? null, country: r.country, logoUrl: approvedSportsImage(r.logo_url)},
         events: ((eventRows ?? []) as unknown as MyEventRow[]).map(mapMyEvent),
       })
     })
@@ -724,7 +761,7 @@ export function useCompetitor(competitorId: string | undefined): {
 
       const { data: links } = await supabase.from('event_competitors').select('event_id').eq('competitor_id', competitorId)
       const eventIds = [...new Set((links ?? []).map((l) => l.event_id as string))]
-      const nowIso = new Date(Date.now() - 3 * 3600_000).toISOString()
+      const visibilityFilter = scheduleVisibilityFilter()
       const byId = new Map<string, LiveEvent>()
       for (let i = 0; i < eventIds.length; i += 200) {
         const { data } = await supabase
@@ -732,8 +769,8 @@ export function useCompetitor(competitorId: string | undefined): {
           .select(MY_EVENT_SELECT)
           .in('id', eventIds.slice(i, i + 200))
           .eq('visibility', 'public')
-          .neq('status', 'finished')
-          .gte('starts_at', nowIso)
+
+          .or(visibilityFilter)
           .order('starts_at', { ascending: true })
         for (const e of (data ?? []) as unknown as MyEventRow[]) byId.set(e.id, mapMyEvent(e))
       }
@@ -742,7 +779,7 @@ export function useCompetitor(competitorId: string | undefined): {
       setState({
         forKey: key,
         configured: true,
-        competitor: { id: c.id, name: c.name, sportKey: c.sports?.key ?? null, country: c.country, logoUrl: c.logo_url, kind: c.kind },
+        competitor: { id: c.id, name: c.name, sportKey: c.sports?.key ?? null, country: c.country, logoUrl: approvedSportsImage(c.logo_url, c.name), kind: c.kind },
         events,
       })
     })
@@ -826,7 +863,7 @@ export function useSportRoster(canonicalSportKey: string, enabled: boolean): { p
         id: p.id,
         name: p.name,
         country: (p as unknown as { country: string | null }).country,
-        logoUrl: (p as unknown as { logo_url: string | null }).logo_url,
+        logoUrl: approvedSportsImage((p as unknown as { logo_url: string | null }).logo_url, p.name),
       }))
       setState({ forKey: canonicalSportKey, players })
     })

@@ -212,11 +212,6 @@ export function AdminPage() {
                 : 'Not reported'
             }
           />
-          {data.watch && (
-            <p className="mt-3 text-sm text-ink/60">
-              {data.watch.pending_affiliates} pending affiliate approvals, {data.watch.approved_affiliates} approved.
-            </p>
-          )}
         </Panel>
         <Panel>
           <PanelHeading title="Secrets" subtitle="Function readiness" />

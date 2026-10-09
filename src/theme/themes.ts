@@ -61,10 +61,10 @@ export const neutralTheme = broadcast('neutral', 'All Sports', '#2ee06f', '#46e8
   cardShape: 'slab',
 })
 
-export const soccerTheme = broadcast('soccer', 'Soccer', '#38e57d', '#46e8ff', {
+export const soccerTheme = broadcast('soccer', 'Soccer', '#f2f2ed', '#b8c2c5', {
   background: 'pitch',
   cardShape: 'ticket',
-}, '#0b6f44')
+}, '#24292b')
 
 export const basketballTheme = broadcast('basketball', 'Basketball', '#ffa94d', '#ff4fd8', {
   background: 'court',
@@ -199,12 +199,13 @@ export const themesByKey: Record<string, SportTheme> = {
 }
 
 export function getTheme(key: string): SportTheme {
-  return themesByKey[key] ?? soccerTheme
+  const aliases: Record<string, string> = { american_football: 'football', combat_sports: 'combat', athletics: 'track', olympic_sports: 'olympic' }
+  return themesByKey[aliases[key] ?? key] ?? neutralTheme
 }
 
 const programPrimary: Record<string, string> = {
   neutral: '#155e38',
-  soccer: '#155e38',
+  soccer: '#24292b',
   basketball: '#9a4f12',
   football: '#8f3a21',
   hockey: '#1f5f78',
@@ -234,7 +235,7 @@ export function withSurfaceMode(theme: SportTheme, mode: 'broadcast' | 'program'
     mode: 'paper',
     colors: {
       ...theme.colors,
-      bg: '#f4ead8',
+      bg: theme.key === 'soccer' ? '#f1f0eb' : theme.key === 'golf' ? '#edf3e2' : theme.key === 'tennis' ? '#f4f3d7' : '#f4ead8',
       surface: '#fbf5e9',
       text: '#1d1812',
       primary,

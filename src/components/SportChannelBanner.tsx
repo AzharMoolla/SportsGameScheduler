@@ -1,8 +1,9 @@
 import type { CSSProperties } from 'react'
 import { ArrowRight } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAppState } from '../app/state-context'
 import { getSport, isSecondarySport } from '../domain/sports'
+import { sportArtwork } from '../data/sportArtwork'
 
 type BannerStat = {
   value: string
@@ -97,8 +98,14 @@ export function SportChannelBanner({
   stats = defaultStats,
 }: SportChannelBannerProps) {
   const { surfaceMode } = useAppState()
+  const [searchParams] = useSearchParams()
+  const studioPreview = sportKey === 'basketball' && searchParams.get('art') === 'studio'
   const sport = getSport(sportKey) ?? getSport('soccer')
   const assetKey = resolveAssetKey(sportKey, sport?.key ?? 'soccer')
+  const refreshed = sportArtwork[assetKey]?.[surfaceMode]
+  const conceptPreview = Boolean(refreshed && !studioPreview && searchParams.get('art') !== 'legacy')
+  const wideEquipment = conceptPreview && ['football', 'hockey', 'motorsport', 'combat', 'track', 'olympic', 'custom'].includes(assetKey)
+  const sceneUrl = studioPreview ? `/assets/sport-banners/studio/basketball-${surfaceMode}-banner.webp` : refreshed?.banner
   const artFocus = artFocusByAsset[assetKey] ?? artFocusByAsset.soccer
   const channelTitle = title ?? `${sport?.label ?? 'Sports'} Channel`
   const coverageBody =
@@ -122,8 +129,8 @@ export function SportChannelBanner({
 
   return (
     <section
-      className="sport-channel-banner"
-      style={bannerStyle}
+      className={`sport-channel-banner${studioPreview || conceptPreview ? ' sport-channel-banner--studio' : ''}${conceptPreview ? ' sport-channel-banner--concept' : ''}${wideEquipment ? ' sport-channel-banner--wide-equipment' : ''}`}
+      style={studioPreview || conceptPreview ? { ...bannerStyle, '--sport-channel-studio': `url("${sceneUrl}")` } as BannerStyle : bannerStyle}
     >
       <div className="sport-channel-panel sport-channel-icon-panel" aria-hidden="true" />
 

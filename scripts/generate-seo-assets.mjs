@@ -82,7 +82,7 @@ const staticRoutes = [
     path: '/privacy',
     title: 'Privacy Policy - Silbo Sports',
     description:
-      'How Silbo Sports handles account details, schedules, alerts, cookies, advertising consent, and your privacy choices.',
+      'How Silbo Sports handles account details, schedules, alerts, essential storage and your privacy choices.',
     priority: '0.3',
     changefreq: 'monthly',
   },
@@ -97,7 +97,7 @@ const staticRoutes = [
 ]
 
 const sportRoutes = [
-  ['soccer', 'Soccer schedule & World Cup live times', 'World Cup, UEFA, EPL, La Liga, and soccer fixtures in your local time.'],
+  ['soccer', 'Soccer schedules in your local time', 'UEFA, EPL, La Liga, and international soccer fixtures in your local time.'],
   ['basketball', 'Basketball schedule & live times', 'NBA, WNBA, FIBA, NCAA, and basketball fixtures in your local time.'],
   ['football', 'American football schedule & live times', 'NFL, CFL, NCAA football, playoffs, bowls, and Grey Cup path in your local time.'],
   ['hockey', 'Hockey schedule & live times', 'NHL, PWHL, IIHF, and hockey puck drops in your local time.'],
@@ -249,7 +249,7 @@ function staticPageBody(routePath, blogBody = '') {
         '<h2>Coverage and accuracy</h2>' +
         paragraphsHtml([
           'Silbo covers major professional, international, college, federation, and community sports. Times, venues, and broadcast details are aggregated from public or licensed third-party sources and may change, so important travel and purchase decisions should be confirmed with the official organizer.',
-          'Silbo Sports is free. Advertising loads only after advertising consent, affiliate destinations are labelled, and paid ads are kept off community and custom-league surfaces.',
+          'Silbo Sports is free to use, with no ads or affiliate promotions. Our focus is clear schedules, local times and useful calendar tools for fans.',
         ]),
     ),
     '/how-it-works': ssrSection(
@@ -264,18 +264,18 @@ function staticPageBody(routePath, blogBody = '') {
     ),
     '/faq': ssrSection(
       'Silbo Sports frequently asked questions',
-      '<h2>Is Silbo Sports free?</h2><p>Yes. The service is supported by consent-gated advertising and clearly labelled affiliate links.</p>' +
+      '<h2>Is Silbo Sports free?</h2><p>Yes. Silbo Sports is free to use, with no ads or affiliate promotions.</p>' +
         '<h2>Do I need an account?</h2><p>No. Your choices can stay in your browser; signing in adds cross-device sync and optional alerts.</p>' +
         '<h2>How accurate are schedules?</h2><p>Schedules are best-effort and may change. Confirm important details with the official league, team, venue, or broadcaster.</p>' +
         '<h2>How does calendar sync work?</h2><p>A private subscription feed can update existing calendar entries when a published time changes. One-time downloads do not update automatically.</p>' +
-        '<h2>What data is collected?</h2><p>Without an account, preferences stay in local browser storage. Signed-in accounts store the information needed to sync follows and deliver alerts you request. Advertising cookies do not load before consent.</p>' +
+        '<h2>What data is collected?</h2><p>Without an account, preferences stay in local browser storage. Signed-in accounts store the information needed to sync follows and deliver alerts you request. Silbo does not load advertising trackers.</p>' +
         '<p><a href="/privacy">Read the Privacy Policy</a> | <a href="/about">About Silbo Sports</a></p>',
     ),
     '/privacy': ssrSection(
       'Silbo Sports Privacy Policy',
       paragraphsHtml([
         'You can use Silbo Sports without an account, in which case follows and display preferences stay in your browser. If you sign in, Silbo stores your email, follows, preferences, calendar-feed settings, and alerts needed to provide the features you request.',
-        'Silbo Sports does not sell personal data. Advertising technology is not loaded until advertising consent is given. Google AdSense and other disclosed service providers may process identifiers according to their own policies when their features are enabled.',
+        'Silbo Sports does not sell personal data or load advertising trackers. Supabase, Cloudflare and Resend provide the database, hosting and email services needed to run the app.',
         'You can decline advertising cookies and continue using the service. Account data and private calendar-feed access can be managed from the account page. Privacy questions can be sent to privacy@silbosports.com.',
       ]),
     ),
@@ -284,7 +284,7 @@ function staticPageBody(routePath, blogBody = '') {
       paragraphsHtml([
         'Silbo Sports provides schedules, timezone conversion, calendar exports, reminders, and third-party destination links on a best-effort basis. Event times, venues, participants, and broadcast availability can change without notice and should be confirmed with the official source before travel or purchases.',
         'Users are responsible for content they publish through community league features and must have permission to share it. Silbo may remove unlawful, abusive, misleading, or privacy-invasive content and may suspend access that harms the service or other users.',
-        'Third-party broadcaster, ticket, and affiliate links are provided for convenience. Their services, availability, prices, and policies are controlled by those third parties. Questions can be sent to privacy@silbosports.com.',
+        'Direct broadcaster links are provided for convenience. Their services, availability, prices, and policies are controlled by those third parties. Questions can be sent to privacy@silbosports.com.',
       ]),
     ),
   }

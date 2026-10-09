@@ -580,6 +580,7 @@ async function teamEvents(env: Env, competitorId: string): Promise<ListEventRow[
 async function supabaseSelect<T>(env: Env, path: string): Promise<T[] | null> {
   if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) return null
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+    signal: AbortSignal.timeout(5000),
     headers: {
       apikey: env.SUPABASE_PUBLISHABLE_KEY,
       authorization: `Bearer ${env.SUPABASE_PUBLISHABLE_KEY}`,

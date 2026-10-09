@@ -19,6 +19,7 @@ export type FeedEvent = {
   sport_key?: string | null
   league_name?: string | null
   description?: string | null
+  url?: string | null
   broadcasts?: Array<{
     country?: string | null
     channel?: string | null
@@ -136,6 +137,8 @@ export function eventToVevent(event: FeedEvent, options: RenderOptions = {}): st
   if (!event.starts_at) return ''
 
   const start = new Date(event.starts_at)
+  if (Number.isNaN(start.getTime())) return ''
+  const eventUrl = event.url ?? (options.appUrl ? `${options.appUrl}/events/${event.id}` : '')
   // No confirmed time → render as an all-day, tentative entry.
   const dateOnly = Boolean(event.starts_at_tbd)
   // Prefer the source feed's real end time; sanity-cap at 24h so one bad row can't produce a
@@ -174,7 +177,7 @@ export function eventToVevent(event: FeedEvent, options: RenderOptions = {}): st
     event.venue_name ? `Venue: ${event.venue_name}` : '',
     broadcastNotes.length ? `Where to watch: ${broadcastNotes.join(', ')}` : '',
     'Times shown in your calendar’s timezone.',
-    options.appUrl ? `View: ${options.appUrl}/events/${event.id}` : '',
+    eventUrl ? `View: ${eventUrl}` : '',
   ].filter(Boolean)
 
   const lines = [
@@ -191,7 +194,7 @@ export function eventToVevent(event: FeedEvent, options: RenderOptions = {}): st
     categories.length ? `CATEGORIES:${categories.map(escapeIcsText).join(',')}` : '',
     cancelled ? 'STATUS:CANCELLED' : tentative ? 'STATUS:TENTATIVE' : 'STATUS:CONFIRMED',
     dateOnly ? 'TRANSP:TRANSPARENT' : '',
-    options.appUrl ? `URL:${options.appUrl}/events/${event.id}` : '',
+    eventUrl ? `URL:${eventUrl}` : '',
     event.venue_name ? `LOCATION:${escapeIcsText(event.venue_name)}` : '',
     descParts.length ? `DESCRIPTION:${escapeIcsText(descParts.join('\n'))}` : '',
     // Reminders: only on timed, non-cancelled events (alarms on all-day TBD entries are noise).

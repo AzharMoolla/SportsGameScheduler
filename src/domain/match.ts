@@ -1,3 +1,4 @@
+import type { LiveEvent } from '../data/liveSport'
 // World Cup match types for the current prototype dataset.
 // These are the concrete shapes used by the WC2026 view today. The generic, multi-sport
 // model the backend will use lives in ./types.ts.
@@ -14,5 +15,7 @@ export type RawMatch = {
 }
 
 export type Match = RawMatch & {
+  id?: string
+  exportEvent?: LiveEvent
   startsAt: Date
 }

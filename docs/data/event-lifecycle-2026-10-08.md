@@ -1,0 +1,14 @@
+# Event lifecycle — 2026-10-08
+
+Implemented at the user's request in Supabase project `bgbkqxdsjnbsizwkslsr` and the local frontend.
+
+- Upcoming events remain listed; provider-confirmed live events stay visible after their start. A scheduled event with an unconfirmed status gets a 24-hour grace window, without being labelled live.
+- Completed events remain in ordinary schedule queries for 48 hours after `completed_at`. First observed completion stamps that field; result corrections do not restart the window. Imported historical finished events receive a conservative start-plus-six-hours timestamp, bounded by the import time, rather than reappearing as new results.
+- SportsDB hydration stores available home/away scores and team names. Final scores render on schedule cards and event pages; missing data is explicitly awaiting provider confirmation. Results are refreshed on the existing bounded hydration cadence, not a promised live-score feed. Other sports with non-score outcomes still require provider-specific result adapters.
+- Ordinary listings hide completed events after 48 hours. Direct event pages remain accessible while retained. Explicit saved events remain accessible in My Schedule after ordinary listing expiry.
+- A daily server-side cleanup runs at 06:47 UTC. It removes up to 1,000 unreferenced public provider events aged at least 90 days from both start and recorded completion. User-created/private events, known live events, saved event follows, active explicit calendar selections, bracket/session references are preserved. Postponed events get a one-year exception. Anonymous/authenticated users cannot execute cleanup; minimum retention cannot be shortened below 90 days.
+- Calendar subscriptions retain 90 days of general event history. Explicit event picks retain stable IDs and calendar UIDs beyond that cutoff. Only saved selections synchronized to the server can inform database retention; unsynchronized browser-only saves are not visible to cleanup.
+
+Validation: TypeScript, lint and 119 unit tests passed for the lifecycle change (122 after the subsequent fight-timing work); desktop/mobile browser tests show recent final scores in both the schedule and detail page. Rollback-only database tests prove completion stamping, correction stability, deletion of an expired unreferenced fixture, reference protection and service-only cleanup execution. No synthetic account/event remains after the tests. A bounded basketball refresh subsequently saved 74 provider scores successfully; other sports catch up through the existing rotation.
+
+The migration and hydration/calendar workers are deployed. The full frontend has not been publicly republished. Existing launch blockers in PRE_LAUNCH_GATE.md still apply. See `supabase/event-lifecycle-check.sql` for repeatable database validation.

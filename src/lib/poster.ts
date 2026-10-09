@@ -149,7 +149,7 @@ function drawTitle(
     const w1 = ctx.measureText(team1).width
     const w2 = ctx.measureText(team2).width
     ctx.font = `800 ${Math.round(s * 0.74)}px Arial, sans-serif`
-    const wv = ctx.measureText(' vs ').width
+    const wv = team2 ? ctx.measureText(' vs ').width : 0
     return w1 + wv + w2
   }
   while (size > 40 && fit(size) > maxWidth) size -= 2
@@ -162,8 +162,8 @@ function drawTitle(
   cursor += ctx.measureText(team1).width
   ctx.font = `800 ${Math.round(size * 0.74)}px Arial, sans-serif`
   ctx.fillStyle = palette.vs
-  ctx.fillText(' vs ', cursor, y)
-  cursor += ctx.measureText(' vs ').width
+  if (team2) ctx.fillText(' vs ', cursor, y)
+  if (team2) cursor += ctx.measureText(' vs ').width
   ctx.font = `900 ${size}px Arial, sans-serif`
   ctx.fillStyle = palette.title
   ctx.fillText(team2, cursor, y)
@@ -346,7 +346,7 @@ export async function createScheduleCanvas(
   if (!isInterior) {
     ctx.fillStyle = p.headline
     ctx.font = '800 60px Arial, sans-serif'
-    ctx.fillText('World Cup 2026 watch schedule', textX + 4, headerTop + 244)
+    ctx.fillText('Your sports watch schedule', textX + 4, headerTop + 244)
     ctx.fillStyle = p.tz
     ctx.font = '700 42px Arial, sans-serif'
     ctx.fillText(`${cityLabel} local time · ${timeZone}${pageSuffix}`, textX + 4, headerTop + 308)

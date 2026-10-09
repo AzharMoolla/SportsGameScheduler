@@ -1,6 +1,6 @@
 # Data inventory — restoration baseline
 
-2026-10-06. Categories reflect application source and schema snapshots. The old database, including 11 accounts, was deleted. They cannot be recovered from the schema/configuration snapshots. No new production dataset has been verified.
+2026-10-07. Categories reflect application source and restored database. The old database, including 11 accounts, was deleted. They cannot be recovered from schema/configuration snapshots. Public provider data and synthetic feed isolation/update checks are verified; real account flows and recovery remain unverified.
 
 | Category | Purpose / source | Storage and third parties | Retention / user control / unresolved checks |
 | --- | --- | --- | --- |
@@ -15,3 +15,5 @@
 | Payments | Future support / premium | Not implemented | Define benefits, processor, cancellation and data flows if this feature is approved. No card data is currently required by the app. |
 
 Outstanding decisions: actual hosting regions and cross-border flows; retention periods per category; deletion/export coverage; recovery for user-created data; permitted provider/image use. Do not invent retention periods or claim legal compliance.
+
+Community leagues now include optional permission-confirmed league/team/player thumbnails in the owner's JSON payload. Inputs are resized to 256 pixels, encoded under 100 KB and stripped of original metadata in the browser; original files are not sent. Share-enabled leagues expose these thumbnails through the gated share resolver. The owner calendar feed may include private community notes; its URL must be treated as a bearer capability. Tokens are hashed in the database and new live tokens are shown only in the creating session. Calendars retain up to 30 days of history; this is feed selection behaviour, not a database retention policy.

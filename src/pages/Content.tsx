@@ -7,7 +7,7 @@ import { useDocumentMeta, useJsonLd } from '../lib/seo'
 import { aboutContent, faqContent, howItWorksContent, type Faq } from '../content/siteContent'
 
 // Standalone editorial pages — substantive, original content that gives the site real depth beyond
-// the scheduling tool (and gives an AdSense reviewer something to read). Shares the clean legal
+// the scheduling tool for sports fans. Shares the clean legal
 // layout look; each sets its own document meta.
 
 function ContentLayout({ title, intro, children }: PropsWithChildren<{ title: string; intro: ReactNode }>) {
@@ -38,7 +38,7 @@ export function AboutPage() {
   useDocumentMeta({
     title: 'About Silbo Sports — one schedule for every sport you follow',
     description:
-      'What Silbo Sports is, why we built it, which sports it covers, and how a free multi-sport schedule that converts every start time to your local zone makes money.',
+      'What Silbo Sports is, why we built it, which sports it covers, and how a free multi-sport schedule that converts every start time to your local zone helps sports fans.',
     canonicalPath: '/about',
   })
   return (

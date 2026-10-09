@@ -43,7 +43,6 @@ export function WatchOptionsPanel({
 }: WatchOptionsPanelProps) {
   const region = (regionCode ?? 'US').toUpperCase()
   const { links } = useWatchOptions({ eventId, leagueId, leagueName, sportKey, regionCode: region, limit })
-  const anyAffiliate = links.some((l) => l.affiliate)
   const styles = VARIANTS[variant]
 
   return (
@@ -59,7 +58,7 @@ export function WatchOptionsPanel({
             key={`${link.name}-${link.href}`}
             href={link.href}
             target="_blank"
-            rel={link.affiliate ? 'sponsored noopener noreferrer' : 'noopener noreferrer'}
+            rel="noopener noreferrer"
             className={`group inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-extrabold shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${styles.link}`}
           >
             <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${styles.icon}`}>
@@ -71,13 +70,8 @@ export function WatchOptionsPanel({
         ))}
       </div>
       <p className={`font-mono text-[10px] uppercase tracking-wide ${styles.note}`}>
-        {region} rights - official/direct links - availability varies by listing
+        {region} viewing options · check event coverage and local blackout restrictions
       </p>
-      {anyAffiliate && (
-        <p className={`text-[11px] ${styles.note}`}>
-          {t('event.watchAffiliate', undefined, locale)}
-        </p>
-      )}
     </div>
   )
 }

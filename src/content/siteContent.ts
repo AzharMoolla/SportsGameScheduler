@@ -1,6 +1,5 @@
 // Original long-form copy for the standalone editorial pages (/about, /how-it-works, /faq) and the
-// homepage explainer. This is the substantive, unique content an AdSense reviewer reads to judge the
-// site, so it is written to describe what Silbo Sports genuinely does. English-only by design.
+// homepage explainer, written for sports fans.
 
 export type Faq = { q: string; a: string }
 
@@ -24,9 +23,9 @@ export const aboutContent = {
       ],
     },
     {
-      heading: 'How we make money',
+      heading: 'Built for fans',
       paragraphs: [
-        'Silbo Sports is free to use. We support the service with advertising, which only loads after you accept advertising cookies, and with affiliate "where to watch" links, which are labelled and may earn us a commission at no extra cost to you. We keep paid ads off community and custom-league surfaces, and we never let advertising compromise the accuracy of the schedule.',
+        'Silbo Sports is free to use, with no ads or affiliate promotions. Our focus is helping fans follow the sports they love, with clear schedules, local times and useful calendar tools.',
       ],
     },
   ],
@@ -40,7 +39,7 @@ export const howItWorksContent = {
     {
       heading: '1. Follow what you care about',
       paragraphs: [
-        'Search for a team, country, league, player, driver, fighter or tournament and follow it. You can follow across sports and competitions at once — a national team for the World Cup, a club for a league season, a Formula 1 team for the year, and a fighter for their next bout can all sit in the same schedule. You do not need an account to start; your picks are saved in your browser, and signing in syncs them across your devices.',
+        'Search for a team, country, league, player, driver, fighter or tournament and follow it. You can follow across sports and competitions at once — a national team for international football, a club for a league season, a Formula 1 team for the year, and a fighter for their next bout can all sit in the same schedule. You do not need an account to start; your picks are saved in your browser, and signing in syncs them across your devices.',
       ],
     },
     {
@@ -52,7 +51,7 @@ export const howItWorksContent = {
     {
       heading: '3. Sync, export or get reminded',
       paragraphs: [
-        'Add any event to your phone or desktop calendar, or subscribe once to a live calendar feed that updates in place when times change. Export your schedule as a calendar file, a shareable image or plain text, and turn on email or push reminders so you get a nudge before an event starts. Each event page also lists where to watch in your region.',
+        'Add any event to your phone or desktop calendar, or subscribe once to a live calendar feed that updates in place when times change. Export your schedule as a calendar file, a shareable image or plain text, and include calendar reminders before an event starts. Each event page also lists where to watch in your region.',
       ],
     },
   ],
@@ -64,11 +63,11 @@ export const faqContent = {
   faqs: [
     {
       q: 'Is Silbo Sports free?',
-      a: 'Yes. Silbo Sports is free to use. It is supported by advertising, which only loads after you accept advertising cookies, and by labelled affiliate "where to watch" links.',
+      a: 'Yes. Silbo Sports is free to use, with no ads or affiliate promotions.',
     },
     {
       q: 'Do I need an account?',
-      a: 'No. You can follow teams and build a schedule without signing in — your picks are stored in your browser. Signing in with a magic link or Google syncs your schedule and preferences across your devices and lets you turn on email or push reminders.',
+      a: 'No. You can follow teams and build a schedule without signing in — your picks are stored in your browser. Signing in with a magic link or Google syncs your schedule and preferences across your devices and lets you create live calendar subscriptions.',
     },
     {
       q: 'Which sports and leagues are covered?',
@@ -100,7 +99,7 @@ export const faqContent = {
     },
     {
       q: 'Where do the "where to watch" links go?',
-      a: 'They point to broadcasters and streaming services that carry an event in your region. Some are affiliate links, which are labelled; tapping one may earn us a commission at no extra cost to you. We never share your identity with the destination.',
+      a: 'They point directly to broadcasters and streaming services that carry an event in your region. Silbo does not add affiliate tracking or earn a commission from these links. Availability and subscription requirements depend on the broadcaster.',
     },
   ] as Faq[],
 }

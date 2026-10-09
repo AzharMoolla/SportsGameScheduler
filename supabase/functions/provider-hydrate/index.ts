@@ -1,3 +1,4 @@
+import { authorizeMaintenance } from '../_shared/maintenance-auth.ts'
 // Paced TheSportsDB hydrator (MP3 data-source work; plan Objective 4).
 //
 // Cron-driven, checkpointed, rate-limit-safe. Each invocation:
@@ -13,15 +14,16 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 
 const API_KEY = Deno.env.get('THESPORTSDB_API_KEY') ?? ''
+const safeError = (error: unknown) => API_KEY ? String(error).replaceAll(API_KEY, '[redacted]') : String(error)
 const BASE = `https://www.thesportsdb.com/api/v1/json/${API_KEY}`
 
-// Premium tier = 100 req/min. ~60 calls/run at 750ms spacing ≈ 80/min ceiling, ~45s wall.
-const CALL_BUDGET = Number(Deno.env.get('HYDRATE_CALL_BUDGET') ?? 60)
-const CALL_SPACING_MS = Number(Deno.env.get('HYDRATE_SPACING_MS') ?? 750)
+// Free-tier pacing: at most about 29 calls/minute, with a bounded call budget.
+const CALL_BUDGET = Math.min(20, Math.max(1, Number(Deno.env.get('HYDRATE_CALL_BUDGET') ?? 20) || 20))
+const CALL_SPACING_MS = Math.max(2100, Number(Deno.env.get('HYDRATE_SPACING_MS') ?? 2100) || 2100)
 
 const TEAMS_TTL_MS = 7 * 24 * 3600_000
 const EVENTS_TTL_MS = 24 * 3600_000
-const NEXT_TTL_MS = 60 * 60_000
+const NEXT_TTL_MS = Math.max(1, Number(Deno.env.get('HYDRATE_NEXT_TTL_HOURS') ?? 6)) * 3600_000
 const VERIFY_TTL_MS = 30 * 24 * 3600_000
 
 const SPORT_FROM_TSDB: Record<string, string> = {
@@ -244,12 +246,13 @@ async function ensureVenues(names: string[]): Promise<Map<string, string>> {
   return map
 }
 
-async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters) {
+async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters, deadline = Infinity) {
   if (!raw.length) return
 
   const teamRows = new Map<string, CompetitorSeed>()
   const inferredCombatByEvent = new Map<string, Array<CompetitorSeed & { corner: 'red' | 'blue' }>>()
   for (const ev of raw) {
+    if (Date.now() > deadline) throw new BudgetSpent()
     if (ev.idHomeTeam && ev.strHomeTeam) teamRows.set(ev.idHomeTeam, { id: ev.idHomeTeam, name: ev.strHomeTeam })
     if (ev.idAwayTeam && ev.strAwayTeam) teamRows.set(ev.idAwayTeam, { id: ev.idAwayTeam, name: ev.strAwayTeam })
     if (ctx.sportKey === 'combat_sports' && ev.idEvent) {
@@ -280,6 +283,7 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters) {
   const kind = kindForSport(ctx.sportKey)
   const toInsert: Array<Record<string, unknown>> = []
   const inserts: Array<{ pid: string; home?: string; away?: string }> = []
+  const unchangedIds: string[] = []
 
   async function replaceParticipants(eventId: string, home?: string, away?: string) {
     await supabase.from('event_competitors').delete().eq('event_id', eventId)
@@ -315,7 +319,13 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters) {
     const inferred = inferredCombatByEvent.get(ev.idEvent)
     const homeId = ev.idHomeTeam ? competitorMap.get(ev.idHomeTeam) : inferred?.[0] ? competitorMap.get(inferred[0].id) : undefined
     const awayId = ev.idAwayTeam ? competitorMap.get(ev.idAwayTeam) : inferred?.[1] ? competitorMap.get(inferred[1].id) : undefined
-    const metadata = { round: ev.intRound ?? null, season: ev.strSeason ?? null, source: 'thesportsdb' }
+    const validScore = (value: string | null | undefined) => value != null && /^\d+(?:\.\d+)?$/.test(String(value)) ? Number(value) : null
+    const homeScore = validScore(ev.intHomeScore)
+    const awayScore = validScore(ev.intAwayScore)
+    const metadata = { round: ev.intRound ?? null, season: ev.strSeason ?? null, source: 'thesportsdb',
+      ...(status === 'finished' || homeScore !== null || awayScore !== null ? { result: {
+        home_score: homeScore, away_score: awayScore, home_team: ev.strHomeTeam ?? null, away_team: ev.strAwayTeam ?? null,
+      } } : {}) }
     const checkedAt = new Date().toISOString()
     const hash = await payloadHash({
       title,
@@ -357,12 +367,12 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters) {
       counters.events += 1
     } else {
       if (prior.payload_hash === hash) {
-        await supabase.from('events').update({ last_checked_at: checkedAt }).eq('id', prior.id)
-        await replaceParticipants(prior.id, homeId, awayId)
-        await replaceTitleInferredBout(prior.id, homeId, awayId)
+        // Preserve unchanged participation/bouts and update freshness in bulk.
+        // Full-season refreshes must fit the hosted function's wall-clock limit.
+        unchangedIds.push(prior.id)
         continue
       }
-      const visibleChange = prior.title !== title || prior.status !== status || prior.starts_at !== iso
+      const visibleChange = prior.title !== title || prior.status !== status || prior.starts_at !== iso || prior.payload_hash !== hash
       if (!visibleChange) {
         await supabase
           .from('events')
@@ -410,6 +420,11 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters) {
     }
   }
 
+  for (let i = 0; i < unchangedIds.length; i += 200) {
+    const { error } = await supabase.from('events').update({ last_checked_at: new Date().toISOString() }).in('id', unchangedIds.slice(i, i + 200))
+    if (error) throw error
+  }
+
   // Batch-insert new events, then their participation rows.
   for (let i = 0; i < toInsert.length; i += 250) {
     const chunk = toInsert.slice(i, i + 250)
@@ -446,13 +461,18 @@ type Target = {
   teams_synced_at: string | null
   events_synced_at: string | null
   next_synced_at: string | null
+  next_season: string | null
+  next_season_synced_at: string | null
 }
 
 function stale(ts: string | null, ttl: number, now: number) {
   return !ts || now - new Date(ts).getTime() > ttl
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  const rejected = await authorizeMaintenance(req, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (rejected) return rejected
+
   if (!API_KEY) {
     return Response.json({ ok: false, error: 'THESPORTSDB_API_KEY not configured' }, { status: 500 })
   }
@@ -460,6 +480,7 @@ Deno.serve(async () => {
   const counters: Counters = { calls: 0, leaguesVerified: 0, teams: 0, events: 0, changed: 0 }
   const api = makeApi(counters)
   const now = Date.now()
+  const body = await req.json().catch(() => ({})) as { sportKey?: string; future?: boolean }
 
   const { data: run } = await supabase
     .from('provider_sync_runs')
@@ -467,18 +488,23 @@ Deno.serve(async () => {
     .select('id')
     .single()
 
-  const { data: targets } = await supabase
+  let targetQuery = supabase
     .from('provider_targets')
-    .select('id, provider_league_id, sport_key, expected_name, current_season, verified_at, teams_synced_at, events_synced_at, next_synced_at')
+    .select('id, provider_league_id, sport_key, expected_name, current_season, verified_at, teams_synced_at, events_synced_at, next_synced_at, next_season, next_season_synced_at')
     .eq('provider_key', 'thesportsdb')
     .eq('is_active', true)
+    .order(body.future ? 'next_season_synced_at' : 'next_synced_at', { ascending: true, nullsFirst: true })
     .order('priority', { ascending: true })
-
+  if (body.sportKey) targetQuery = targetQuery.eq('sport_key', body.sportKey)
   let stopped: 'budget' | 'rate_limited' | 'done' = 'done'
 
   try {
+    const { data: targets, error: targetQueryError } = await targetQuery
+    if (targetQueryError) throw targetQueryError
     for (const target of (targets ?? []) as Target[]) {
      try {
+      if (Date.now() - now > 100_000) throw new BudgetSpent()
+      if (body.future && (!target.next_season || !stale(target.next_season_synced_at, 7 * 24 * 3600_000, now))) continue
       // 1. Verify + upsert league.
       let ctx: Ctx | null
       if (stale(target.verified_at, VERIFY_TTL_MS, now)) {
@@ -490,6 +516,19 @@ Deno.serve(async () => {
           ctx = await verifyAndUpsertLeague(api, target, counters)
           if (!ctx) continue
         }
+      }
+
+      // Published next-year calendars are independent of the current season cursor.
+      if (body.future) {
+        const json = await api(`eventsseason.php?id=${target.provider_league_id}&s=${encodeURIComponent(target.next_season!)}`)
+        const events = (json.events as RawEvent[] | null) ?? []
+        await upsertEvents(ctx, events, counters, now + 100_000)
+        const { error } = await supabase.from('provider_targets').update({
+          next_season_synced_at: new Date().toISOString(),
+          last_status: `future_season:${target.next_season}:${events.length}`, last_error: null,
+        }).eq('id', target.id)
+        if (error) throw error
+        continue
       }
 
       // 2. Teams + badges + stadiums. Current API uses search_all_teams.php?l={leagueName}
@@ -520,7 +559,7 @@ Deno.serve(async () => {
         const json = await api(`eventsseason.php?id=${target.provider_league_id}&s=${encodeURIComponent(season)}`)
         const events = (json.events as RawEvent[] | null) ?? []
         if (events.length) {
-          await upsertEvents(ctx, events, counters)
+          await upsertEvents(ctx, events, counters, now + 100_000)
           await supabase
             .from('provider_targets')
             .update({ events_synced_at: new Date().toISOString(), last_status: `season_synced:${events.length}` })
@@ -530,7 +569,7 @@ Deno.serve(async () => {
           // still gets data, and mark it so we don't loop on the empty season.
           const nextJson = await api(`eventsnextleague.php?id=${target.provider_league_id}`)
           const nextEvents = (nextJson.events as RawEvent[] | null) ?? []
-          await upsertEvents(ctx, nextEvents, counters)
+          await upsertEvents(ctx, nextEvents, counters, now + 100_000)
           await supabase
             .from('provider_targets')
             .update({
@@ -544,7 +583,7 @@ Deno.serve(async () => {
         // 4. Warm delta: just the next upcoming fixtures (cheap, catches time/status changes).
         const json = await api(`eventsnextleague.php?id=${target.provider_league_id}`)
         const events = (json.events as RawEvent[] | null) ?? []
-        await upsertEvents(ctx, events, counters)
+        await upsertEvents(ctx, events, counters, now + 100_000)
         await supabase
           .from('provider_targets')
           .update({ next_synced_at: new Date().toISOString(), last_status: `next_synced:${events.length}` })
@@ -555,7 +594,7 @@ Deno.serve(async () => {
        if (targetError instanceof RateLimited || targetError instanceof BudgetSpent) throw targetError
        await supabase
          .from('provider_targets')
-         .update({ last_status: 'error', last_error: String(targetError) })
+         .update({ last_status: 'error', last_error: safeError(targetError) })
          .eq('id', target.id)
      }
     }
@@ -565,9 +604,9 @@ Deno.serve(async () => {
     else {
       await supabase
         .from('provider_sync_runs')
-        .update({ status: 'failed', error: String(error), fetched_count: counters.events, changed_count: counters.changed, finished_at: new Date().toISOString() })
+        .update({ status: 'failed', error: safeError(error), fetched_count: counters.events, changed_count: counters.changed, finished_at: new Date().toISOString() })
         .eq('id', run!.id)
-      return Response.json({ ok: false, error: String(error), counters }, { status: 500 })
+      return Response.json({ ok: false, error: safeError(error), counters }, { status: 500 })
     }
   }
 

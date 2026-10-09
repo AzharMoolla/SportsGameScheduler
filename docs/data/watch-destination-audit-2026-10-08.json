@@ -1,0 +1,781 @@
+{
+  "checked_at": "2026-10-08T04:53:55.881Z",
+  "scope": "HTTP destinations only; does not establish current rights, individual event carriage or blackout eligibility",
+  "results": [
+    {
+      "key": "apple_mls",
+      "url": "https://tv.apple.com/us/channel/mls/tvs.sbd.7000",
+      "status": 200,
+      "destination": "https://tv.apple.com/us/channel/mls/tvs.sbd.7000",
+      "health": "reachable"
+    },
+    {
+      "key": "apple_tv",
+      "url": "https://tv.apple.com/",
+      "status": 200,
+      "destination": "https://tv.apple.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "ard",
+      "url": "https://www.ardmediathek.de/",
+      "status": 200,
+      "destination": "https://www.ardmediathek.de/",
+      "health": "reachable"
+    },
+    {
+      "key": "bbc_iplayer",
+      "url": "https://www.bbc.co.uk/iplayer",
+      "status": 200,
+      "destination": "https://www.bbc.co.uk/iplayer",
+      "health": "reachable"
+    },
+    {
+      "key": "bein_sports",
+      "url": "https://www.beinsports.com/",
+      "status": 200,
+      "destination": "https://www.beinsports.com/en-us",
+      "health": "reachable"
+    },
+    {
+      "key": "blastpremier_twitch",
+      "url": "https://www.twitch.tv/blastpremier",
+      "status": 200,
+      "destination": "https://www.twitch.tv/blastpremier",
+      "health": "reachable"
+    },
+    {
+      "key": "canal_plus",
+      "url": "https://www.canalplus.com/",
+      "status": 200,
+      "destination": "https://www.canalplus.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "cazetv",
+      "url": "https://www.youtube.com/@CazeTV",
+      "status": 200,
+      "destination": "https://www.youtube.com/@CazeTV",
+      "health": "reachable"
+    },
+    {
+      "key": "cbc_gem",
+      "url": "https://gem.cbc.ca/",
+      "status": 200,
+      "destination": "https://gem.cbc.ca/",
+      "health": "reachable"
+    },
+    {
+      "key": "cbs_sports",
+      "url": "https://www.cbssports.com/",
+      "status": 200,
+      "destination": "https://www.cbssports.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "cfl_plus",
+      "url": "https://www.cfl.ca/plus/",
+      "status": 200,
+      "destination": "https://cfl.ca/plus/",
+      "health": "reachable"
+    },
+    {
+      "key": "channel4",
+      "url": "https://www.channel4.com/now/C4",
+      "status": 200,
+      "destination": "https://www.channel4.com/now/C4",
+      "health": "reachable"
+    },
+    {
+      "key": "crave",
+      "url": "https://www.crave.ca/",
+      "status": 200,
+      "destination": "https://www.crave.ca/",
+      "health": "reachable"
+    },
+    {
+      "key": "ctv_tsn_rds",
+      "url": "https://www.tsn.ca/soccer",
+      "status": 200,
+      "destination": "https://www.tsn.ca/soccer/",
+      "health": "reachable"
+    },
+    {
+      "key": "dazn",
+      "url": "https://www.dazn.com/",
+      "status": 200,
+      "destination": "https://www.dazn.com/en-CA/home",
+      "health": "reachable"
+    },
+    {
+      "key": "dazn_es",
+      "url": "https://www.dazn.com/es-ES/home",
+      "status": 200,
+      "destination": "https://www.dazn.com/es-ES/home",
+      "health": "reachable"
+    },
+    {
+      "key": "dazn_it",
+      "url": "https://www.dazn.com/it-IT/home",
+      "status": 200,
+      "destination": "https://www.dazn.com/it-IT/home",
+      "health": "reachable"
+    },
+    {
+      "key": "discovery_plus",
+      "url": "https://www.discoveryplus.com/",
+      "status": 200,
+      "destination": "https://www.discoveryplus.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "dr_tv",
+      "url": "https://www.dr.dk/drtv/",
+      "status": 200,
+      "destination": "https://www.dr.dk/drtv/",
+      "health": "reachable"
+    },
+    {
+      "key": "dstv_supersport",
+      "url": "https://www.dstv.com/",
+      "status": 200,
+      "destination": "https://www.dstv.com/en-za/",
+      "health": "reachable"
+    },
+    {
+      "key": "eslcs_twitch",
+      "url": "https://www.twitch.tv/eslcs",
+      "status": 200,
+      "destination": "https://www.twitch.tv/eslcs",
+      "health": "reachable"
+    },
+    {
+      "key": "espn_plus",
+      "url": "https://plus.espn.com/",
+      "status": 403,
+      "destination": "https://plus.espn.com/denied",
+      "health": "needs_browser_review"
+    },
+    {
+      "key": "espn_watch",
+      "url": "https://www.espn.com/watch/",
+      "status": 200,
+      "destination": "https://www.espn.com/watch/?country=us&redirected=true",
+      "health": "reachable"
+    },
+    {
+      "key": "fancode",
+      "url": "https://www.fancode.com/",
+      "status": 200,
+      "destination": "https://www.fancode.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "formula1_tv",
+      "url": "https://f1tv.formula1.com/",
+      "status": 200,
+      "destination": "https://f1tv.formula1.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "fox_sports",
+      "url": "https://www.foxsports.com/soccer/fifa-world-cup",
+      "status": 200,
+      "destination": "https://www.foxsports.com/soccer/fifa-world-cup",
+      "health": "reachable"
+    },
+    {
+      "key": "fubo",
+      "url": "https://www.fubo.tv/",
+      "status": 200,
+      "destination": "https://www.fubo.tv/welcome",
+      "health": "reachable"
+    },
+    {
+      "key": "globo",
+      "url": "https://ge.globo.com/",
+      "status": 200,
+      "destination": "https://ge.globo.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "golf_channel",
+      "url": "https://www.golfchannel.com/watch/on-air-schedule",
+      "status": 200,
+      "destination": "https://www.golfchannel.com/watch/on-air-schedule",
+      "health": "reachable"
+    },
+    {
+      "key": "hotstar_jio",
+      "url": "https://www.hotstar.com/in",
+      "status": 200,
+      "destination": "https://www.hotstar.com/ca",
+      "health": "reachable"
+    },
+    {
+      "key": "icc_tv",
+      "url": "https://www.icc.tv/",
+      "status": 200,
+      "destination": "https://www.icc-cricket.com/icc-tv",
+      "health": "reachable"
+    },
+    {
+      "key": "ion",
+      "url": "https://iontelevision.com/sports",
+      "status": 200,
+      "destination": "https://iontelevision.com/sports",
+      "health": "reachable"
+    },
+    {
+      "key": "itvx",
+      "url": "https://www.itv.com/",
+      "status": 200,
+      "destination": "https://www.itv.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "ligue1_plus",
+      "url": "https://ligue1.com/en/offres-ligue1plus",
+      "status": 500,
+      "destination": "https://ligue1.com/en/offres-ligue1plus",
+      "health": "needs_browser_review"
+    },
+    {
+      "key": "lolesports",
+      "url": "https://lolesports.com/",
+      "status": 200,
+      "destination": "https://lolesports.com/en-US/",
+      "health": "reachable"
+    },
+    {
+      "key": "m6",
+      "url": "https://www.m6.fr/",
+      "status": 200,
+      "destination": "https://www.m6.fr/",
+      "health": "reachable"
+    },
+    {
+      "key": "magenta_sport",
+      "url": "https://www.magentasport.de/",
+      "status": 200,
+      "destination": "https://www.magentasport.de/",
+      "health": "reachable"
+    },
+    {
+      "key": "max_tnt",
+      "url": "https://www.max.com/",
+      "status": 200,
+      "destination": "https://www.hbomax.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "mlb_tv",
+      "url": "https://www.mlb.com/live-stream-games",
+      "status": 200,
+      "destination": "https://www.mlb.com/live-stream-games",
+      "health": "reachable"
+    },
+    {
+      "key": "movistar_plus",
+      "url": "https://www.movistarplus.es/",
+      "status": 200,
+      "destination": "https://www.movistarplus.es/",
+      "health": "reachable"
+    },
+    {
+      "key": "mtv_katsomo",
+      "url": "https://www.mtv.fi/",
+      "status": 200,
+      "destination": "https://www.mtv.fi/",
+      "health": "reachable"
+    },
+    {
+      "key": "nba_league_pass",
+      "url": "https://www.nba.com/watch/league-pass-stream",
+      "status": 200,
+      "destination": "https://www.nba.com/league-pass-purchase",
+      "health": "reachable"
+    },
+    {
+      "key": "nba_watch_guide",
+      "url": "https://www.nba.com/news/how-to-watch-games-2026-27-season",
+      "status": 200,
+      "destination": "https://www.nba.com/news/how-to-watch-games-2026-27-season",
+      "health": "reachable"
+    },
+    {
+      "key": "nbc_olympics",
+      "url": "https://www.nbcolympics.com/",
+      "status": 200,
+      "destination": "https://www.nbcolympics.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "nbc_sports",
+      "url": "https://www.nbcsports.com/soccer/premier-league",
+      "status": 200,
+      "destination": "https://www.nbcsports.com/soccer/premier-league",
+      "health": "reachable"
+    },
+    {
+      "key": "nfl_game_pass_dazn",
+      "url": "https://www.dazn.com/en-GB/l/nfl-game-pass",
+      "status": 200,
+      "destination": "https://www.dazn.com/en-GB/l/nfl-game-pass",
+      "health": "reachable"
+    },
+    {
+      "key": "nhl_tv_dazn",
+      "url": "https://www.dazn.com/",
+      "status": 200,
+      "destination": "https://www.dazn.com/en-CA/home",
+      "health": "reachable"
+    },
+    {
+      "key": "nhl_watch_guide",
+      "url": "https://www.nhl.com/info/how-to-watch-and-stream-nhl-games",
+      "status": 200,
+      "destination": "https://www.nhl.com/info/how-to-watch-and-stream-nhl-games",
+      "health": "reachable"
+    },
+    {
+      "key": "nos",
+      "url": "https://nos.nl/sport",
+      "status": 200,
+      "destination": "https://nos.nl/sport",
+      "health": "reachable"
+    },
+    {
+      "key": "now_sports",
+      "url": "https://www.nowtv.com/membership/watch-sky-sports",
+      "status": 200,
+      "destination": "https://www.nowtv.com/membership/watch-sky-sports",
+      "health": "reachable"
+    },
+    {
+      "key": "nrk_tv",
+      "url": "https://tv.nrk.no/",
+      "status": 200,
+      "destination": "https://tv.nrk.no/",
+      "health": "reachable"
+    },
+    {
+      "key": "olympics_com",
+      "url": "https://olympics.com/",
+      "status": 403,
+      "destination": "https://www.olympics.com/",
+      "health": "needs_browser_review"
+    },
+    {
+      "key": "orf_on",
+      "url": "https://on.orf.at/",
+      "status": 200,
+      "destination": "https://on.orf.at/",
+      "health": "reachable"
+    },
+    {
+      "key": "paramount_plus",
+      "url": "https://www.paramountplus.com/",
+      "status": 200,
+      "destination": "https://www.paramountplus.com/ca/",
+      "health": "reachable"
+    },
+    {
+      "key": "pdc_tv",
+      "url": "https://video.pdc.tv/",
+      "status": 200,
+      "destination": "https://www.pdc.tv/videos",
+      "health": "reachable"
+    },
+    {
+      "key": "peacock",
+      "url": "https://www.peacocktv.com/",
+      "status": 200,
+      "destination": "https://www.peacocktv.com/unavailable",
+      "health": "reachable"
+    },
+    {
+      "key": "pga_tour",
+      "url": "https://www.pgatour.com/watch",
+      "status": 200,
+      "destination": "https://www.pgatour.com/watch",
+      "health": "reachable"
+    },
+    {
+      "key": "ppv_com",
+      "url": "https://www.ppv.com/",
+      "status": 200,
+      "destination": "https://www.ppv.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "premier_sports",
+      "url": "https://www.premiersports.com/",
+      "status": 200,
+      "destination": "https://www.premiersports.com/ca",
+      "health": "reachable"
+    },
+    {
+      "key": "prime_video",
+      "url": "https://www.primevideo.com/",
+      "status": 200,
+      "destination": "https://www.primevideo.com/offers/nonprimehomepage?ref_=dv_web_force_root",
+      "health": "reachable"
+    },
+    {
+      "key": "pwhl_site",
+      "url": "https://www.thepwhl.com/en/where-to-watch",
+      "status": 200,
+      "destination": "https://www.thepwhl.com/en/where-to-watch",
+      "health": "reachable"
+    },
+    {
+      "key": "pwhl_youtube",
+      "url": "https://www.youtube.com/@thepwhlofficial",
+      "status": 200,
+      "destination": "https://www.youtube.com/@thepwhlofficial",
+      "health": "reachable"
+    },
+    {
+      "key": "rai_play",
+      "url": "https://www.raiplay.it/",
+      "status": 200,
+      "destination": "https://www.raiplay.it/",
+      "health": "reachable"
+    },
+    {
+      "key": "rtbf_auvio",
+      "url": "https://auvio.rtbf.be/",
+      "status": 200,
+      "destination": "https://auvio.rtbf.be/",
+      "health": "reachable"
+    },
+    {
+      "key": "rte_player",
+      "url": "https://www.rte.ie/player/",
+      "status": 200,
+      "destination": "https://www.rte.ie/player/",
+      "health": "reachable"
+    },
+    {
+      "key": "rtp_play",
+      "url": "https://www.rtp.pt/play/",
+      "status": 200,
+      "destination": "https://www.rtp.pt/play/",
+      "health": "reachable"
+    },
+    {
+      "key": "rtve",
+      "url": "https://www.rtve.es/play/",
+      "status": 200,
+      "destination": "https://www.rtve.es/play/internacional/portada/",
+      "health": "reachable"
+    },
+    {
+      "key": "rugbypass_tv",
+      "url": "https://rugbypass.tv/",
+      "status": 200,
+      "destination": "https://rugbypass.tv/",
+      "health": "reachable"
+    },
+    {
+      "key": "sbs_on_demand",
+      "url": "https://www.sbs.com.au/ondemand/",
+      "status": 200,
+      "destination": "https://www.sbs.com.au/ondemand/",
+      "health": "reachable"
+    },
+    {
+      "key": "servus_tv",
+      "url": "https://www.servustv.com/",
+      "status": 200,
+      "destination": "https://www.servustv.com/de",
+      "health": "reachable"
+    },
+    {
+      "key": "showmax",
+      "url": "https://www.showmax.com/",
+      "health": "network_unverified"
+    },
+    {
+      "key": "sky_de",
+      "url": "https://www.sky.de/sport",
+      "status": 200,
+      "destination": "https://www.sky.de/sport",
+      "health": "reachable"
+    },
+    {
+      "key": "sky_it",
+      "url": "https://programmi.sky.it/sport",
+      "status": 200,
+      "destination": "https://programmi.sky.it/sport",
+      "health": "reachable"
+    },
+    {
+      "key": "sky_sports",
+      "url": "https://www.skysports.com/",
+      "status": 200,
+      "destination": "https://www.skysports.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "sling",
+      "url": "https://www.sling.com/",
+      "status": 200,
+      "destination": "https://www.sling.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "sonyliv",
+      "url": "https://www.sonyliv.com/",
+      "status": 200,
+      "destination": "https://www.sonyliv.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "sport_tv_pt",
+      "url": "https://www.sporttv.pt/",
+      "status": 200,
+      "destination": "https://www.sporttv.pt/",
+      "health": "reachable"
+    },
+    {
+      "key": "sportsnet_plus",
+      "url": "https://www.sportsnetplus.ca/",
+      "status": 200,
+      "destination": "https://www.sportsnetplus.ca/",
+      "health": "reachable"
+    },
+    {
+      "key": "srg_ssr",
+      "url": "https://www.srgssr.ch/",
+      "status": 200,
+      "destination": "https://www.srgssr.ch/de/start/",
+      "health": "reachable"
+    },
+    {
+      "key": "svt_play",
+      "url": "https://www.svtplay.se/",
+      "status": 200,
+      "destination": "https://www.svtplay.se/",
+      "health": "reachable"
+    },
+    {
+      "key": "telefe",
+      "url": "https://mitelefe.com/",
+      "status": 200,
+      "destination": "https://www.mitelefe.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "telemundo",
+      "url": "https://www.telemundo.com/deportes",
+      "status": 200,
+      "destination": "https://www.telemundo.com/deportes",
+      "health": "reachable"
+    },
+    {
+      "key": "televisa",
+      "url": "https://www.tudn.com/",
+      "status": 200,
+      "destination": "https://www.tudn.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "tennis_tv",
+      "url": "https://www.tennistv.com/",
+      "status": 200,
+      "destination": "https://www.tennistv.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "tnt_sports_uk",
+      "url": "https://www.tntsports.co.uk/",
+      "status": 200,
+      "destination": "https://www.tntsports.co.uk/",
+      "health": "reachable"
+    },
+    {
+      "key": "tsn",
+      "url": "https://www.tsn.ca/",
+      "status": 200,
+      "destination": "https://www.tsn.ca/",
+      "health": "reachable"
+    },
+    {
+      "key": "tudn",
+      "url": "https://www.tudn.com/",
+      "status": 200,
+      "destination": "https://www.tudn.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "tv_azteca",
+      "url": "https://www.tvazteca.com/aztecadeportes/",
+      "status": 200,
+      "destination": "https://www.tvazteca.com/aztecadeportes/",
+      "health": "reachable"
+    },
+    {
+      "key": "tv2_dk",
+      "url": "https://tv2.dk/",
+      "status": 200,
+      "destination": "https://tv2.dk/",
+      "health": "reachable"
+    },
+    {
+      "key": "tv2_play_no",
+      "url": "https://play.tv2.no/",
+      "status": 200,
+      "destination": "https://play.tv2.no/",
+      "health": "reachable"
+    },
+    {
+      "key": "tv4_play",
+      "url": "https://www.tv4play.se/",
+      "status": 200,
+      "destination": "https://www.tv4play.se/",
+      "health": "reachable"
+    },
+    {
+      "key": "tvi",
+      "url": "https://tvi.iol.pt/",
+      "status": 200,
+      "destination": "https://tvi.iol.pt/",
+      "health": "reachable"
+    },
+    {
+      "key": "tvnz",
+      "url": "https://www.tvnz.co.nz/",
+      "status": 200,
+      "destination": "https://www.tvnz.co.nz/",
+      "health": "reachable"
+    },
+    {
+      "key": "tvp_sport",
+      "url": "https://sport.tvp.pl/",
+      "status": 200,
+      "destination": "https://sport.tvp.pl/",
+      "health": "reachable"
+    },
+    {
+      "key": "tyc_sports",
+      "url": "https://www.tycsports.com/",
+      "status": 200,
+      "destination": "https://www.tycsports.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "uefa_watch_guide",
+      "url": "https://www.uefa.com/uefachampionsleague/news/0253-0d82037aaedd-f371c464f919-1000--where-to-watch-the-champions-league-tv-broadcast-partners-streams/",
+      "status": 200,
+      "destination": "https://www.uefa.com/uefachampionsleague/news/0253-0d82037aaedd-f371c464f919-1000--where-to-watch-the-champions-league-tv-broadcast-partners-streams/",
+      "health": "reachable"
+    },
+    {
+      "key": "ufc_fight_pass",
+      "url": "https://ufcfightpass.com/",
+      "status": 200,
+      "destination": "https://ufcfightpass.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "usa_network",
+      "url": "https://www.usanetwork.com/",
+      "status": 200,
+      "destination": "https://www.usanetwork.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "valorant_twitch",
+      "url": "https://www.twitch.tv/valorant",
+      "status": 200,
+      "destination": "https://www.twitch.tv/valorant",
+      "health": "reachable"
+    },
+    {
+      "key": "vbtv",
+      "url": "https://tv.volleyballworld.com/",
+      "status": 200,
+      "destination": "https://tv.volleyballworld.com/",
+      "health": "reachable"
+    },
+    {
+      "key": "viaplay",
+      "url": "https://viaplay.com/",
+      "status": 200,
+      "destination": "https://viaplay.com/ca-en/",
+      "health": "reachable"
+    },
+    {
+      "key": "vrt_max",
+      "url": "https://www.vrt.be/vrtmax/",
+      "status": 200,
+      "destination": "https://www.vrt.be/vrtmax/",
+      "health": "reachable"
+    },
+    {
+      "key": "willow_tv",
+      "url": "https://www.willow.tv/",
+      "status": 200,
+      "destination": "https://www.willow.tv/",
+      "health": "reachable"
+    },
+    {
+      "key": "wimbledon_tv",
+      "url": "https://www.wimbledon.com/en_GB/about/tv_coverage",
+      "status": 200,
+      "destination": "https://www.wimbledon.com/en_GB/about/tv_coverage",
+      "health": "reachable"
+    },
+    {
+      "key": "wnba_league_pass",
+      "url": "https://www.wnba.com/leaguepass",
+      "status": 200,
+      "destination": "https://www.wnba.com/leaguepass",
+      "health": "reachable"
+    },
+    {
+      "key": "world_athletics_watch",
+      "url": "https://worldathletics.org/watch/live",
+      "status": 200,
+      "destination": "https://worldathletics.org/watch/live",
+      "health": "reachable"
+    },
+    {
+      "key": "wst_play",
+      "url": "https://www.wst.tv/watch-live/",
+      "status": 200,
+      "destination": "https://www.wst.tv/watch-live/",
+      "health": "reachable"
+    },
+    {
+      "key": "wtt_live",
+      "url": "https://www.worldtabletennis.com/livevideo",
+      "status": 200,
+      "destination": "https://www.worldtabletennis.com/livevideo",
+      "health": "reachable"
+    },
+    {
+      "key": "yle_areena",
+      "url": "https://areena.yle.fi/",
+      "status": 200,
+      "destination": "https://areena.yle.fi/tv",
+      "health": "reachable"
+    },
+    {
+      "key": "zdf",
+      "url": "https://www.zdf.de/",
+      "status": 200,
+      "destination": "https://www.zdf.de/",
+      "health": "reachable"
+    },
+    {
+      "key": "ziggo_sport",
+      "url": "https://www.ziggosport.nl/",
+      "status": 200,
+      "destination": "https://www.ziggosport.nl/",
+      "health": "reachable"
+    }
+  ]
+}

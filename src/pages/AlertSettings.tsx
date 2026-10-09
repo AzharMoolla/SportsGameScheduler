@@ -139,6 +139,7 @@ export function AlertSettingsPage() {
             </p>
           </div>
         </div>
+        <p className="text-sm text-ink/70">Email and push delivery are paused during restoration. Calendar files and subscriptions can include working calendar reminders.</p>
         <SignUpNudge trigger="alerts" />
         <Link to="/my-schedule">
           <Button variant="ghost">Back to My Schedule</Button>
@@ -149,6 +150,7 @@ export function AlertSettingsPage() {
 
   return (
     <div className="space-y-4">
+      <Panel><p className="text-sm text-ink/70">Email and push delivery are paused during restoration. Preferences can be saved, but no messages will be sent until delivery is enabled and tested. Use calendar reminders for now.</p></Panel>
       <div className="flex items-center gap-2">
         <BellRing size={20} className="text-primary" />
         <div>

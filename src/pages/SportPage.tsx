@@ -1,37 +1,31 @@
-import { ArrowUpRight, Bell, Check, ChevronDown, Download, Flag, Search, Sparkles, Star, Ticket, Timer, Trophy, Tv, Users, X } from 'lucide-react'
+import { estimateFightCard, fightDiscipline } from '../lib/fightTiming'
+import { FightTimingPanel } from '../components/FightTimingPanel'
+import { FinalResult } from '../components/FinalResult'
+import { approvedSportsImage } from '../lib/mediaRights'
+import { ArrowUpRight, Bell, Check, ChevronDown, Download, Flag, Search, Star, Timer, Trophy, Tv, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAppState } from '../app/state-context'
-import { CityPicker } from '../components/CityPicker'
 import { CountryFlagMark } from '../components/CountryFlagMark'
-import { MatchCard } from '../components/MatchCard'
 import { SportChannelBanner } from '../components/SportChannelBanner'
-import { SportWatchTicketsPanel } from '../components/SportTicketsPanel'
-import { TicketOptionsPanel } from '../components/TicketOptionsPanel'
+import { useSportActivity } from '../data/sportActivity'
+import { SportWatchPanel } from '../components/SportWatchPanel'
 import { WatchOptionsPanel } from '../components/WatchOptionsPanel'
 import { WatchProviderBadges } from '../components/WatchProviderBadges'
-import { Badge, Button, EmptyState, Panel, PanelHeading } from '../components/ui'
-import { deriveTeams, filterMatchesForTeams, filterUpcomingMatches, useMatches } from '../data/liveMatches'
+import { Badge, EmptyState, Panel, PanelHeading } from '../components/ui'
 import { useEvent, useSportRoster, useSportSchedule, type LeagueTeam, type LiveEvent } from '../data/liveSport'
-import { allMatches, featuredTeams } from '../data/worldcup'
 import { exportFilename } from '../domain/brand'
-import type { Match } from '../domain/match'
 import { getSport, pluralizeEventNoun, type SportInfo } from '../domain/sports'
 import type { CanonicalSportKey } from '../domain/types'
-import { AdSlot } from '../components/AdSlot'
-import { interleaveAds } from '../lib/ads'
 import { downloadBlob } from '../lib/clipboard'
 import { useDocumentMeta, useJsonLd } from '../lib/seo'
 import { getSportGuide } from '../content/sportGuides'
-import { findConflictTiers, type OverlapTier } from '../lib/sportTiming'
 import { createMultiSportIcsBlob } from '../lib/ics'
-import { getSavedMatchKeys, toggleSavedMatch } from '../lib/store'
 import { groupRaceWeekends, parseRaceWeekendTitle, RACE_SESSION_LABELS, type RaceWeekend } from '../lib/raceWeekends'
 import { formatDate, formatLongDate, formatTime, relativeTimeFromNow } from '../lib/time'
 
 const INDIVIDUAL_SPORTS = ['tennis', 'golf', 'athletics', 'combat_sports']
 const SCHEDULE_PAGE_SIZE = 24
-const SOCCER_SPORT = getSport('soccer')!
 
 type SeasonReturnMarker = {
   id: string
@@ -182,8 +176,7 @@ export function SportPage() {
     return <EmptyState title="Unknown sport" body="That sport is not in the catalog yet." />
   }
 
-  // Soccer keeps the polished World Cup planner, but other soccer leagues are selectable too.
-  const page = sport.canonicalSportKey === 'soccer' ? <SoccerPage /> : <LiveSportPage sport={sport} />
+  const page = <LiveSportPage sport={sport} />
 
   return (
     <>
@@ -249,370 +242,12 @@ function SportGuideSection({ canonicalKey, sportLabel }: { canonicalKey: string;
   )
 }
 
-// Soccer: World Cup planner by default, with pills to switch to other live soccer leagues
-// (EPL, La Liga, UCL, …) even while the World Cup is on. Leagues arrive viewership-ordered.
-function SoccerPage() {
-  const { prefs, toggleFollow, followedLeagueIds, followedCompetitorIds } = useAppState()
-  const { leagues, events, lastUpdated } = useSportSchedule('soccer')
-  const [selectedLeagueIds, setSelectedLeagueIds] = useState<string[]>([])
-  const [selectedCompetitorIds, setSelectedCompetitorIds] = useState<string[]>([])
-  const [selectedCompetitionIds, setSelectedCompetitionIds] = useState<string[]>([])
-  const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
-  const [addedEventIds, setAddedEventIds] = useState<string[]>([])
-  const [eventPager, setEventPager] = useState({ key: 'none', page: 1 })
-
-  // Exclude the World Cup league rows (openfootball + TheSportsDB) — the planner IS the WC.
-  const otherLeagues = useMemo(() => leagues.filter((l) => !/world cup/i.test(l.name)), [leagues])
-  const liveSoccerEvents = useMemo(
-    () => events.filter((event) => !/world cup/i.test(event.leagueName)),
-    [events],
-  )
-  const leagueEvents = useMemo(
-    () => filterEventsBySelections(liveSoccerEvents, selectedLeagueIds, selectedCompetitorIds, selectedCompetitionIds),
-    [liveSoccerEvents, selectedLeagueIds, selectedCompetitorIds, selectedCompetitionIds],
-  )
-  const hasLiveFilters = selectedLeagueIds.length > 0 || selectedCompetitorIds.length > 0 || selectedCompetitionIds.length > 0
-  const eventPageCount = pageCountFor(leagueEvents.length)
-  const eventPageKey = `soccer:${selectedLeagueIds.join(',')}:${selectedCompetitorIds.join(',')}:${selectedCompetitionIds.join(',')}`
-  const eventPage = activePageFor(eventPager, eventPageKey, eventPageCount)
-  const pagedLeagueEvents = useMemo(
-    () => leagueEvents.slice((eventPage - 1) * SCHEDULE_PAGE_SIZE, eventPage * SCHEDULE_PAGE_SIZE),
-    [leagueEvents, eventPage],
-  )
-
-  function changeEventPage(page: number) {
-    setEventPager({ key: eventPageKey, page })
-    setExpandedEventId(null)
-  }
-
-  function addEventToSchedule(event: LiveEvent) {
-    downloadBlob(createMultiSportIcsBlob([event], { reminderMinutes: [60] }), exportFilename('event', 'ics'))
-    setAddedEventIds((current) => (current.includes(event.id) ? current : [...current, event.id]))
-  }
-
-  return (
-    <div className="space-y-4">
-      <DataFreshness lastUpdated={lastUpdated} />
-      <SportEntityFilters
-        leagues={otherLeagues}
-        events={liveSoccerEvents}
-        selectedLeagueIds={selectedLeagueIds}
-        selectedCompetitorIds={selectedCompetitorIds}
-        selectedCompetitionIds={selectedCompetitionIds}
-        followedLeagueIds={followedLeagueIds}
-        followedCompetitorIds={followedCompetitorIds}
-        competitorLabel="Teams"
-        competitionLabel="Cups / Competitions"
-        emptyCompetitionsLabel="Cup and tournament filters appear when those fixtures are in the live window."
-        onToggleLeague={(id) => setSelectedLeagueIds((current) => toggleId(current, id))}
-        onToggleCompetitor={(id) => setSelectedCompetitorIds((current) => toggleId(current, id))}
-        onToggleCompetition={(id) => setSelectedCompetitionIds((current) => toggleId(current, id))}
-        onToggleLeagueFollow={(league) => toggleFollow({ targetType: 'league', targetId: league.id, intent: 'watch' })}
-        onToggleCompetitorFollow={(competitor) => toggleFollow({ targetType: 'competitor', targetId: competitor.id, intent: 'watch' })}
-        onClear={() => {
-          setSelectedLeagueIds([])
-          setSelectedCompetitorIds([])
-          setSelectedCompetitionIds([])
-        }}
-      />
-
-      {!hasLiveFilters ? (
-        <WorldCupPlanner />
-      ) : (
-        <section className="space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-extrabold text-primary">
-                {filterSummary('Soccer', selectedLeagueIds, selectedCompetitorIds, selectedCompetitionIds)}
-              </h1>
-              <p className="text-sm text-ink/60">
-                {leagueEvents.length} upcoming - shown in {prefs.timezone}
-              </p>
-            </div>
-          </div>
-          {leagueEvents.length > 0 ? (
-            <>
-              <SchedulePagination page={eventPage} pageCount={eventPageCount} total={leagueEvents.length} onPageChange={changeEventPage} label="fixtures" />
-              {interleaveAds(pagedLeagueEvents, (e) => e.id, 6).map((entry) =>
-                entry.kind === 'ad' ? (
-                  <AdSlot key={entry.key} format="leaderboard" />
-                ) : (
-                  <div key={entry.key} className="space-y-2">
-                    <EventTicket
-                      event={entry.item}
-                      locale={prefs.locale}
-                      hour12={prefs.hour12}
-                      timeZone={prefs.timezone}
-                      regionCode={prefs.broadcastRegion || prefs.regionCode}
-                      expanded={expandedEventId === entry.item.id}
-                      onToggle={() => setExpandedEventId((current) => (current === entry.item.id ? null : entry.item.id))}
-                      added={addedEventIds.includes(entry.item.id)}
-                      onAdd={() => addEventToSchedule(entry.item)}
-                    />
-                    {expandedEventId === entry.item.id && <EventQuickDetails eventId={entry.item.id} />}
-                  </div>
-                ),
-              )}
-              <SchedulePagination page={eventPage} pageCount={eventPageCount} total={leagueEvents.length} onPageChange={changeEventPage} label="fixtures" />
-            </>
-          ) : (
-            <EmptyState
-              title="No upcoming fixtures"
-              body="This league is between seasons — its next fixtures sync in automatically as they're published."
-            />
-          )}
-        </section>
-      )}
-    </div>
-  )
-}
-
-function WorldCupPlanner() {
-  const { followedTeams, toggleFollow, prefs } = useAppState()
-  const [query, setQuery] = useState('')
-  const [savedMatchKeys, setSavedMatchKeys] = useState<string[]>(() => getSavedMatchKeys())
-  const [matchPager, setMatchPager] = useState({ key: 'all', page: 1 })
-  const [kitWallCollapsed, setKitWallCollapsed] = useState(true)
-  const timeZone = prefs.timezone
-  const { matches, source } = useMatches()
-
-  const visibleTeams = useMemo(() => {
-    const teams = deriveTeams(matches)
-    const normalizedQuery = query.trim().toLowerCase()
-    const pinned = teams.filter((team) => featuredTeams.includes(team))
-    const rest = teams.filter((team) => !featuredTeams.includes(team))
-    const ordered = [...pinned, ...rest]
-    return normalizedQuery ? ordered.filter((team) => team.toLowerCase().includes(normalizedQuery)) : ordered
-  }, [query, matches])
-
-  // Match list shows upcoming only (no finished games); the kit wall below still derives from the
-  // full set so every nation stays followable even after its group games have played.
-  const filteredMatches = useMemo(
-    () => filterUpcomingMatches(filterMatchesForTeams(matches, followedTeams)),
-    [matches, followedTeams],
-  )
-  // Overlap is a personal-schedule signal: only flag clashes once the user has narrowed to their
-  // teams. On the full browse (no follows) every match has a simultaneous twin, which is just noise.
-  const conflicts = useMemo(
-    () =>
-      followedTeams.length
-        ? findConflictTiers(filteredMatches.map((m) => ({ startsAt: m.startsAt, sportKey: 'soccer' })))
-        : new Map<number, OverlapTier>(),
-    [filteredMatches, followedTeams],
-  )
-  const matchPageCount = pageCountFor(filteredMatches.length)
-  const followedTeamSignature = followedTeams.join('|')
-  const matchPageKey = followedTeamSignature || 'all'
-  const matchPage = activePageFor(matchPager, matchPageKey, matchPageCount)
-  const pagedMatches = useMemo(
-    () =>
-      filteredMatches
-        .map((match, index) => ({ match, index }))
-        .slice((matchPage - 1) * SCHEDULE_PAGE_SIZE, matchPage * SCHEDULE_PAGE_SIZE),
-    [filteredMatches, matchPage],
-  )
-  const popularPicksActive = featuredTeams.every((team) => followedTeams.includes(team))
-
-  function changeMatchPage(page: number) {
-    setMatchPager({ key: matchPageKey, page })
-  }
-
-  const venueCount = useMemo(() => new Set(allMatches.map((match) => match.ground)).size, [])
-  const confirmedTeamCount = useMemo(() => deriveTeams(matches).length, [matches])
-
-  function toggleTeam(team: string) {
-    toggleFollow({ targetType: 'team', targetId: team, intent: 'watch' })
-  }
-
-  function toggleFeatured() {
-    for (const team of featuredTeams) {
-      const selected = followedTeams.includes(team)
-      if ((popularPicksActive && selected) || (!popularPicksActive && !selected)) {
-        toggleFollow({ targetType: 'team', targetId: team, intent: 'watch' })
-      }
-    }
-  }
-
-  function clearAll() {
-    for (const team of [...followedTeams]) {
-      toggleFollow({ targetType: 'team', targetId: team, intent: 'watch' })
-    }
-  }
-
-  function matchKey(match: { date: string; team1: string; team2: string }) {
-    return `${match.date}-${match.team1}-${match.team2}`
-  }
-
-  // Add/remove the match from My Schedule (persisted) — no surprise file download.
-  function addMatchToSchedule(match: Match) {
-    setSavedMatchKeys(toggleSavedMatch(matchKey(match)))
-  }
-
-  return (
-    <div className="space-y-4">
-      <SportChannelBanner
-        title="World Cup '26"
-        kicker={source === 'live' ? 'Channel 01 / Live tournament capsule' : 'Channel 01 / Tournament capsule'}
-        sportKey="soccer"
-        body={`Follow your nations and every kickoff lands in ${timeZone} — group stage to final, whistle to whistle, with no offset math to do.`}
-        ctaLabel="Sync schedule"
-        ctaTo="/calendar"
-        stats={[
-          { value: String(allMatches.length), label: 'Matches' },
-          { value: String(venueCount), label: 'Host cities' },
-          { value: String(confirmedTeamCount), label: 'Teams' },
-          { value: '1', label: 'Trophy' },
-        ]}
-      />
-
-      <SportWatchTicketsPanel
-        sport={SOCCER_SPORT}
-        regionCode={prefs.regionCode}
-        broadcastRegionCode={prefs.broadcastRegion || prefs.regionCode}
-        placement="web-sport-soccer-tickets"
-        watchTitle="Official World Cup broadcaster routes"
-        watchSubtitle={`Region: ${(prefs.broadcastRegion || prefs.regionCode || 'US').toUpperCase()}`}
-        leagueName="FIFA World Cup 2026"
-        sportKey="soccer"
-        locale={prefs.locale}
-      />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink/60">
-          {kitWallCollapsed ? 'Open the kit wall when you want to change followed nations.' : 'Pick your nations from the kit wall.'}
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <CityPicker compact />
-          <Button
-            variant={popularPicksActive ? 'solid' : 'subtle'}
-            onClick={toggleFeatured}
-            aria-pressed={popularPicksActive}
-          >
-            <Sparkles size={15} /> {popularPicksActive ? 'Popular on' : 'Popular picks'}
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-        <Panel className="h-fit lg:sticky lg:top-20">
-          <PanelHeading
-            title="The kit wall"
-            subtitle={kitWallCollapsed ? `${followedTeams.length} followed` : 'Pick the sides you want to follow.'}
-          >
-            <button
-              type="button"
-              title={kitWallCollapsed ? 'Show kit wall' : 'Minimize kit wall'}
-              aria-label={kitWallCollapsed ? 'Show kit wall' : 'Minimize kit wall'}
-              onClick={() => setKitWallCollapsed((current) => !current)}
-              className="rounded-lg p-2 text-ink/50 hover:bg-primary/10 hover:text-primary"
-            >
-              {kitWallCollapsed ? <ChevronDown size={16} /> : <X size={16} />}
-            </button>
-          </PanelHeading>
-
-          {kitWallCollapsed ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-page/60 px-3 py-2">
-              <p className="text-sm font-medium text-ink/70">
-                {followedTeams.length
-                  ? `${followedTeams.length} nation${followedTeams.length === 1 ? '' : 's'} selected`
-                  : 'Selector minimized'}
-              </p>
-              <div className="flex items-center gap-2">
-                {followedTeams.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearAll}
-                    className="rounded-lg px-2 py-1 text-xs font-bold text-ink/55 hover:bg-primary/10 hover:text-primary"
-                  >
-                    Clear
-                  </button>
-                )}
-                <Button variant="subtle" onClick={() => setKitWallCollapsed(false)}>
-                  Show
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <label className="mb-3 flex items-center gap-2 rounded-lg border border-primary/20 bg-page/60 px-3 py-2">
-                <Search size={15} className="text-ink/40" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search teams"
-                  className="w-full bg-transparent text-sm outline-none"
-                />
-              </label>
-
-              <div className="silbo-scrollbar grid max-h-[260px] grid-cols-1 gap-1 overflow-y-auto pr-1 sm:max-h-[360px] lg:max-h-[480px]">
-                {visibleTeams.map((team) => {
-                  const selected = followedTeams.includes(team)
-                  return (
-                    <button
-                      type="button"
-                      key={team}
-                      onClick={() => toggleTeam(team)}
-                      aria-pressed={selected}
-                      className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-[13px] font-medium transition-colors sm:gap-3 sm:py-2 sm:text-sm ${
-                        selected ? 'bg-primary text-void' : 'hover:bg-primary/5'
-                      }`}
-                    >
-                      <CountryFlagMark
-                        name={team}
-                        selected={selected}
-                        size="md"
-                        fallback={
-                          <span
-                            className={`flex h-7 w-8 items-center justify-center rounded-md text-[11px] font-extrabold ${
-                              selected ? 'bg-void/25 text-void' : 'bg-primary/10 text-primary'
-                            }`}
-                          >
-                            {team.slice(0, 2).toUpperCase()}
-                          </span>
-                        }
-                      />
-                      <span className="flex-1">{team}</span>
-                      {selected && <Check size={15} />}
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </Panel>
-
-        <section className="space-y-3">
-          <p className="text-sm font-semibold text-ink/60">
-            {followedTeams.length > 0
-              ? `${filteredMatches.length} matches for ${followedTeams.length} teams`
-              : `All ${filteredMatches.length} confirmed group-stage matches — follow teams to narrow this down`}
-          </p>
-          <SchedulePagination page={matchPage} pageCount={matchPageCount} total={filteredMatches.length} onPageChange={changeMatchPage} label="matches" />
-            {pagedMatches.map(({ match, index }) => (
-              <MatchCard
-                key={`${match.date}-${match.team1}-${match.team2}`}
-                match={match}
-                timeZone={timeZone}
-                conflict={conflicts.get(index) ?? null}
-                highlightTeams={followedTeams}
-                locale={prefs.locale}
-                hour12={prefs.hour12}
-                addedToSchedule={savedMatchKeys.includes(matchKey(match))}
-                onAddToSchedule={() => addMatchToSchedule(match)}
-                regionCode={prefs.broadcastRegion || prefs.regionCode}
-              />
-            ))}
-          <SchedulePagination page={matchPage} pageCount={matchPageCount} total={filteredMatches.length} onPageChange={changeMatchPage} label="matches" />
-        </section>
-      </div>
-    </div>
-  )
-}
-
 // Live, DB-backed page for every non-soccer sport: banner + league filter + upcoming events,
 // plus an athlete roster for individual sports (tennis/golf/athletics/combat).
 function LiveSportPage({ sport }: { sport: SportInfo }) {
-  const { prefs, toggleFollow, followedLeagueIds, followedCompetitorIds } = useAppState()
+  const activity = useSportActivity()
+  const feature = activity.ranked.find(item=>item.sportKey===sport.canonicalSportKey)
+  const { prefs, toggleFollow, followedLeagueIds, followedCompetitorIds, followedEventIds } = useAppState()
   const canonical = sport.canonicalSportKey
   const isIndividual = INDIVIDUAL_SPORTS.includes(canonical)
   // Motorsport reads better as race weekends than a flat session list — group it (see raceWeekends.ts).
@@ -623,7 +258,7 @@ function LiveSportPage({ sport }: { sport: SportInfo }) {
   const [selectedCompetitorIds, setSelectedCompetitorIds] = useState<string[]>([])
   const [selectedCompetitionIds, setSelectedCompetitionIds] = useState<string[]>([])
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
-  const [addedEventIds, setAddedEventIds] = useState<string[]>([])
+  const addedEventIds = followedEventIds
   const [eventPager, setEventPager] = useState({ key: `${canonical}:all`, page: 1 })
 
   const shownEvents = useMemo(
@@ -650,23 +285,17 @@ function LiveSportPage({ sport }: { sport: SportInfo }) {
   }
 
   function addEventToSchedule(event: LiveEvent) {
-    downloadBlob(createMultiSportIcsBlob([event], { reminderMinutes: [60] }), exportFilename('event', 'ics'))
-    setAddedEventIds((current) => (current.includes(event.id) ? current : [...current, event.id]))
+    toggleFollow({ targetType: 'event', targetId: event.id, intent: 'watch' })
   }
 
   function addWeekendToSchedule(weekend: RaceWeekend<LiveEvent>) {
-    const events = weekend.sessions.map((s) => s.event)
-    downloadBlob(createMultiSportIcsBlob(events, { reminderMinutes: [60] }), exportFilename('race-weekend', 'ics'))
-    setAddedEventIds((current) => {
-      const next = new Set(current)
-      for (const event of events) next.add(event.id)
-      return [...next]
-    })
+    for (const { event } of weekend.sessions) {
+      if (!followedEventIds.includes(event.id)) toggleFollow({ targetType: 'event', targetId: event.id, intent: 'watch' })
+    }
   }
 
   function addSeasonReturnToSchedule(marker: SeasonReturnMarker) {
     downloadBlob(createMultiSportIcsBlob([seasonMarkerToEvent(marker)], { reminderMinutes: [] }), exportFilename('season-return', 'ics'))
-    setAddedEventIds((current) => (current.includes(marker.id) ? current : [...current, marker.id]))
   }
 
   const stats = [
@@ -680,6 +309,7 @@ function LiveSportPage({ sport }: { sport: SportInfo }) {
   return (
     <div className="space-y-5">
       <SportChannelBanner
+        title={feature?.bannerTitle}
         kicker={`Channel · ${sport.flagshipLeague}`}
         sportKey={sport.key}
         body={`${getSportGuide(sport.canonicalSportKey)?.banner ?? `${sport.tagline}.`} Every start time in ${prefs.timezone} — ready to sync, export, or remind you.`}
@@ -688,11 +318,10 @@ function LiveSportPage({ sport }: { sport: SportInfo }) {
         stats={stats}
       />
 
-      <SportWatchTicketsPanel
+      <SportWatchPanel
         sport={sport}
         regionCode={prefs.regionCode}
         broadcastRegionCode={prefs.broadcastRegion || prefs.regionCode}
-        placement={`web-sport-${sport.key}-tickets`}
         watchTitle={`${sport.label} broadcaster routes`}
         watchSubtitle="Availability varies by league and listing"
         leagueName={sport.flagshipLeague}
@@ -758,23 +387,20 @@ function LiveSportPage({ sport }: { sport: SportInfo }) {
                 <>
                   <p className="text-sm font-semibold text-ink/60">{shownEvents.length} upcoming</p>
                   <SchedulePagination page={eventPage} pageCount={eventPageCount} total={shownEvents.length} onPageChange={changeEventPage} label="events" />
-                  {interleaveAds(pagedShownEvents, (e) => e.id, 6).map((entry) =>
-                    entry.kind === 'ad' ? (
-                      <AdSlot key={entry.key} format="leaderboard" />
-                    ) : (
-                      <div key={entry.key} className="space-y-2">
+                  {pagedShownEvents.map((event) => (
+                      <div key={event.id} className="space-y-2">
                         <EventTicket
-                          event={entry.item}
+                          event={event}
                           locale={prefs.locale}
                           hour12={prefs.hour12}
                           timeZone={prefs.timezone}
                           regionCode={prefs.broadcastRegion || prefs.regionCode}
-                          expanded={expandedEventId === entry.item.id}
-                          onToggle={() => setExpandedEventId((current) => (current === entry.item.id ? null : entry.item.id))}
-                          added={addedEventIds.includes(entry.item.id)}
-                          onAdd={() => addEventToSchedule(entry.item)}
+                          expanded={expandedEventId === event.id}
+                          onToggle={() => setExpandedEventId((current) => (current === event.id ? null : event.id))}
+                          added={addedEventIds.includes(event.id)}
+                          onAdd={() => addEventToSchedule(event)}
                         />
-                        {expandedEventId === entry.item.id && <EventQuickDetails eventId={entry.item.id} />}
+                        {expandedEventId === event.id && <EventQuickDetails eventId={event.id} />}
                       </div>
                     ),
                   )}
@@ -1002,10 +628,6 @@ function toggleId(current: string[], id: string) {
   return current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
 }
 
-function filterSummary(label: string, leagueIds: string[], competitorIds: string[], competitionIds: string[]) {
-  const count = leagueIds.length + competitorIds.length + competitionIds.length
-  return count ? `${label} filters (${count})` : label
-}
 
 function slugifyFilter(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -1158,12 +780,13 @@ function filterEventsBySelections(events: LiveEvent[], leagueIds: string[], comp
 }
 
 function FilterLogo({ option, selected, mode }: { option: FilterOption; selected: boolean; mode: FilterMode }) {
-  if (option.logoUrl) {
+  const imageUrl = approvedSportsImage(option.logoUrl, option.label)
+  if (imageUrl) {
     return (
       <span className={`relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[10px] font-extrabold ${selected ? 'border-void/30 bg-void/15 text-void' : 'border-primary/15 bg-page/80 text-primary'}`}>
         {initialsForFilter(option.label)}
         <img
-          src={option.logoUrl}
+          src={imageUrl}
           alt=""
           loading="lazy"
           className="absolute inset-0 h-full w-full bg-page object-contain p-0.5"
@@ -1219,7 +842,8 @@ function ParticipantBadge({
     </span>
   )
 
-  if (logoUrl) {
+  const clearedLogo = approvedSportsImage(logoUrl, name)
+  if (clearedLogo) {
     return (
       <span
         title={name}
@@ -1227,7 +851,7 @@ function ParticipantBadge({
       >
         {initialsForFilter(name)}
         <img
-          src={logoUrl}
+          src={clearedLogo}
           alt=""
           loading="lazy"
           className="absolute inset-0 h-full w-full bg-page object-contain p-0.5"
@@ -1268,7 +892,7 @@ function eventProviderImage(event: LiveEvent): string | null {
   const circuit = event.metadata?.circuit
   if (circuit && typeof circuit === 'object' && 'image' in circuit) {
     const image = (circuit as { image?: unknown }).image
-    return typeof image === 'string' && image ? image : null
+    return typeof image === 'string' ? approvedSportsImage(image) : null
   }
   return null
 }
@@ -1393,6 +1017,7 @@ function SportEntityFilters({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              aria-label={`Search ${activeMode}`}
               placeholder={`Search ${activeMode === 'leagues' ? 'leagues' : activeMode === 'competitors' ? competitorLabel.toLowerCase() : competitionLabel.toLowerCase()}`}
               className="w-full bg-transparent text-sm outline-none placeholder:text-ink/40"
             />
@@ -1415,22 +1040,14 @@ function SportEntityFilters({
           return (
             <div
               key={option.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => toggleOption(option.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  toggleOption(option.id)
-                }
-              }}
-              aria-pressed={selected}
               className={`motion-filter-pill relative flex min-h-9 max-w-full items-center gap-1.5 rounded-full border py-1 pl-2 pr-3 text-left transition-colors ${selected ? 'is-selected border-primary bg-primary text-void' : 'border-primary/25 text-ink/75 hover:bg-primary/10 hover:text-primary'}`}
             >
               {optionFollowButton(option)}
+              <button type="button" aria-label={`Filter by ${option.label}`} aria-pressed={selected} onClick={()=>toggleOption(option.id)} className="flex min-h-8 min-w-0 items-center gap-1.5 text-left">
               <FilterLogo option={option} selected={selected} mode={activeMode} />
               <span className="max-w-[220px] truncate text-xs font-bold">{option.label}</span>
               <span className={`font-mono text-[10px] ${selected ? 'text-void/70' : 'text-ink/40'}`}>{option.count}</span>
+              </button>
               {selected && activeMode === 'competitors' && (
                 <Link
                   to={`/teams/${option.id}`}
@@ -1458,16 +1075,6 @@ function SportEntityFilters({
           return (
             <div
               key={option.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => toggleOption(option.id)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  toggleOption(option.id)
-                }
-              }}
-              aria-pressed={selected}
               className={`motion-filter-pill relative flex min-h-9 max-w-full items-center gap-1.5 rounded-full border py-1 pl-2 pr-3 text-left transition-colors ${
                 selected
                   ? 'is-selected border-primary bg-primary/80 text-void'
@@ -1475,9 +1082,11 @@ function SportEntityFilters({
               }`}
             >
               {optionFollowButton(option)}
+              <button type="button" aria-label={`Filter by ${option.label}`} aria-pressed={selected} onClick={()=>toggleOption(option.id)} className="flex min-h-8 min-w-0 items-center gap-1.5 text-left">
               <FilterLogo option={option} selected={selected} mode={activeMode} />
               <span className="max-w-[220px] truncate text-xs font-bold">{option.label}</span>
               <span className={`font-mono text-[9px] uppercase ${selected ? 'text-void/70' : 'text-ink/35'}`}>Soon</span>
+              </button>
               {selected && activeMode === 'competitors' && (
                 <Link
                   to={`/teams/${option.id}`}
@@ -2062,6 +1671,7 @@ function EventTicket({
           <ChevronDown size={16} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
       </div>
+      <FinalResult status={event.status} metadata={event.metadata} />
       {event.status !== 'scheduled' && (
         <span className="m-3 self-start">
           <Badge tone={event.status === 'finished' ? 'muted' : 'warning'}>{event.status}</Badge>
@@ -2071,17 +1681,9 @@ function EventTicket({
   )
 }
 
-function ticketUrlFromMetadata(metadata: Record<string, unknown>) {
-  for (const key of ['ticketmaster_url', 'ticket_url', 'tickets_url']) {
-    const value = metadata[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
-  }
-  return null
-}
-
 function EventQuickDetails({ eventId }: { eventId: string }) {
   const { prefs, followedLeagueIds, toggleFollow } = useAppState()
-  const { event, loading, configured } = useEvent(eventId)
+  const { event, loading, configured } = useEvent(eventId, true)
   const [selectedBoutId, setSelectedBoutId] = useState<string | null>(null)
 
   if (loading) {
@@ -2111,6 +1713,7 @@ function EventQuickDetails({ eventId }: { eventId: string }) {
   const leagueFollowed = detail.leagueId ? followedLeagueIds.includes(detail.leagueId) : false
   const selectedBout = detail.bouts.find((bout) => bout.id === selectedBoutId) ?? detail.bouts[0] ?? null
   const selectedBoutIndex = selectedBout ? detail.bouts.findIndex((bout) => bout.id === selectedBout.id) : -1
+  const timingWindows = estimateFightCard(event.startsAt,event.bouts,fightDiscipline(event.leagueName,event.metadata),event.fighterHistory)
   const titleInferredBouts = detail.bouts.some((bout) => bout.metadata.source === 'title_inference')
   const facts = [
     ['When', when],
@@ -2149,7 +1752,7 @@ function EventQuickDetails({ eventId }: { eventId: string }) {
       </dl>
 
       <div className="rounded-lg border border-dashed border-primary/25 bg-page/45 p-3">
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3">
           <section>
             <p className="mb-1 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ink/55">
               <Tv size={13} /> Where to watch
@@ -2161,22 +1764,6 @@ function EventQuickDetails({ eventId }: { eventId: string }) {
               sportKey={detail.sportKey}
               regionCode={prefs.broadcastRegion || prefs.regionCode}
               locale={prefs.locale}
-              compact
-            />
-          </section>
-          <section>
-            <p className="mb-1 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ink/55">
-              <Ticket size={13} /> Tickets
-            </p>
-            <TicketOptionsPanel
-              title={detail.title}
-              leagueName={detail.leagueName}
-              venue={venue}
-              regionCode={prefs.regionCode}
-              eventId={detail.id}
-              placement="web-sport-quick-details"
-              ticketmasterUrl={ticketUrlFromMetadata(event.metadata)}
-              limit={3}
               compact
             />
           </section>
@@ -2202,6 +1789,7 @@ function EventQuickDetails({ eventId }: { eventId: string }) {
         </div>
       )}
 
+      {event.bouts.length > 0 && <FightTimingPanel event={detail} timezone={prefs.timezone} locale={prefs.locale} hour12={prefs.hour12} />}
       {event.bouts.length > 0 && (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
           <div className="space-y-1.5">
@@ -2210,7 +1798,7 @@ function EventQuickDetails({ eventId }: { eventId: string }) {
             </p>
             {event.bouts.map((bout, index) => {
               const active = selectedBout?.id === bout.id
-              const estimatedStart = bout.estimatedStartAt ?? estimateBoutStart(event.startsAt, index)
+              const estimatedStart = timingWindows.find(window=>window.id===bout.id)?.expected
               return (
                 <button
                   key={bout.id}
@@ -2296,13 +1884,6 @@ function EventQuickDetails({ eventId }: { eventId: string }) {
   )
 }
 
-const FIGHT_SLOT_MINUTES = 30
-
-function estimateBoutStart(cardStart: Date | null, index: number) {
-  if (!cardStart) return null
-  return new Date(cardStart.getTime() + index * FIGHT_SLOT_MINUTES * 60_000)
-}
-
 function metadataFact(metadata: Record<string, unknown>, key: string, label: string): [string, string] | null {
   const value = metadata[key]
   return typeof value === 'string' && value.trim() ? [label, readableSportFact(value)] : null
@@ -2348,6 +1929,7 @@ function RosterPanel({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search players"
+              aria-label="Search players"
               className="w-full bg-transparent text-sm outline-none"
             />
           </label>
@@ -2356,6 +1938,7 @@ function RosterPanel({
               const following = followedSet.has(p.id)
               return (
                 <li key={p.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-primary/8">
+                  {approvedSportsImage(null, p.name) && <img src={approvedSportsImage(null, p.name)!} alt="" loading="lazy" className="h-9 w-9 shrink-0 rounded-full object-cover" />}
                   <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
                   {p.country && <span className="shrink-0 font-mono text-[10px] uppercase text-ink/45">{p.country}</span>}
                   <button

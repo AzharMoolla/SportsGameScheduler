@@ -4,11 +4,13 @@
 // is server-rendered from the database with stable UID/SEQUENCE and lives in
 // supabase/functions/calendar-feed.
 
+import { renderCalendar } from '../../supabase/functions/_shared/ics'
 import type { Match } from '../domain/match'
 import { brand } from '../domain/brand'
 import type { LiveEvent } from '../data/liveSport'
+import { customLeagueEvents } from './scheduleAdapter'
 import type { CustomLeague } from './store'
-import { formatIcsDate, formatIcsDateOnly, formatLongDate, formatTime, slug } from './time'
+import { formatIcsDate, formatLongDate, formatTime, slug } from './time'
 
 /**
  * Escape text for iCalendar TEXT fields per RFC 5545 §3.3.11.
@@ -83,56 +85,16 @@ export function createMultiSportIcsBlob(
   events: LiveEvent[],
   options: { reminderMinutes?: number[] } = {},
 ): Blob {
-  const body = events
-    .filter((event) => event.startsAt)
-    .map((event) => {
-      const start = event.startsAt as Date
-      const dateOnly = event.startsAtTbd
-      const end = new Date(start.getTime() + (dateOnly ? 24 : 2) * 60 * 60 * 1000)
-      const meta = event.sportKey ? SPORT_META[event.sportKey] : undefined
-      const summary = meta ? `${meta.emoji} ${event.title}` : event.title
-      const categories = [meta?.label, event.leagueName].filter(Boolean) as string[]
-      const cancelled = event.status === 'cancelled'
-      const tentative = !cancelled && (dateOnly || event.status === 'postponed')
-      const alarms =
-        !dateOnly && !cancelled
-          ? (options.reminderMinutes ?? []).flatMap((m) => [
-              'BEGIN:VALARM',
-              'ACTION:DISPLAY',
-              'DESCRIPTION:Reminder',
-              `TRIGGER:-PT${Math.max(0, Math.round(m))}M`,
-              'END:VALARM',
-            ])
-          : []
-
-      return renderIcsLines([
-        'BEGIN:VEVENT',
-        `UID:silbo-${event.id}@silbosports.com`,
-        `DTSTAMP:${formatIcsDate(new Date())}`,
-        dateOnly ? `DTSTART;VALUE=DATE:${formatIcsDateOnly(start)}` : `DTSTART:${formatIcsDate(start)}`,
-        dateOnly ? `DTEND;VALUE=DATE:${formatIcsDateOnly(end)}` : `DTEND:${formatIcsDate(end)}`,
-        `SUMMARY:${escapeIcsText(summary)}`,
-        categories.length ? `CATEGORIES:${categories.map(escapeIcsText).join(',')}` : '',
-        cancelled ? 'STATUS:CANCELLED' : tentative ? 'STATUS:TENTATIVE' : 'STATUS:CONFIRMED',
-        event.venue ? `LOCATION:${escapeIcsText(event.venue)}` : '',
-        event.leagueName ? `DESCRIPTION:${escapeIcsText(`League: ${event.leagueName}`)}` : '',
-        ...alarms,
-        'END:VEVENT',
-      ])
-    })
-    .join('\r\n')
-
-  const calendar = renderIcsLines([
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    `PRODID:-//${brand.appName}//Sports Scheduler//EN`,
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    `X-WR-CALNAME:${escapeIcsText(brand.scheduleTitle)}`,
-  ])
-  const footer = 'END:VCALENDAR'
-
-  return new Blob([[calendar, body, footer].filter(Boolean).join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+  return new Blob([renderCalendar(brand.scheduleTitle, events.map(event => ({
+    id: event.id, title: event.title, starts_at: event.startsAt?.toISOString() ?? null,
+    starts_at_tbd: event.startsAtTbd, status: event.status,
+    ends_at: typeof event.metadata?.ends_at === 'string' ? event.metadata.ends_at : null,
+    updated_at: typeof event.metadata?.updated_at === 'string' ? event.metadata.updated_at : new Date().toISOString(),
+    version: typeof event.metadata?.version === 'number' ? event.metadata.version : 1,
+    venue_name: event.venue, sport_key: event.sportKey, league_name: event.leagueName,
+    description: typeof event.metadata?.description === 'string' ? event.metadata.description : undefined,
+    url: event.metadata?.custom_league_id ? 'https://silbosports.com/custom-leagues' : undefined,
+  })), { ...options, appUrl: 'https://silbosports.com' })], { type: 'text/calendar;charset=utf-8' })
 }
 
 export function createIcsBlob(filteredMatches: Match[], timeZone: string, locale?: string, hour12?: boolean | null) {
@@ -182,41 +144,6 @@ export function createIcsBlob(filteredMatches: Match[], timeZone: string, locale
 }
 
 export function createCustomLeagueIcsBlob(league: CustomLeague) {
-  const body = league.events
-    .filter((event) => event.status !== 'cancelled')
-    .map((event) => {
-      const start = new Date(event.startsAt)
-      const end = new Date(start.getTime() + 90 * 60 * 1000)
-      const detailParts = [
-        event.opponent ? `vs ${event.opponent}` : '',
-        event.arriveEarlyMinutes ? `Arrive ${event.arriveEarlyMinutes} min early` : '',
-        event.uniformColor ? `Uniform: ${event.uniformColor}` : '',
-        league.includeNotesInShare ? event.notes ?? '' : '',
-      ].filter(Boolean)
-
-      return renderIcsLines([
-        'BEGIN:VEVENT',
-        `UID:silbo-custom-${event.id}@local`,
-        `DTSTAMP:${formatIcsDate(new Date())}`,
-        `DTSTART:${formatIcsDate(start)}`,
-        `DTEND:${formatIcsDate(end)}`,
-        `SUMMARY:${escapeIcsText(`${league.name}: ${event.title}`)}`,
-        event.venue ? `LOCATION:${escapeIcsText(event.venue)}` : '',
-        `DESCRIPTION:${escapeIcsText(detailParts.join(' | '))}`,
-        'END:VEVENT',
-      ])
-    })
-    .join('\r\n')
-
-  const calendar = renderIcsLines([
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    `PRODID:-//${brand.appName}//Community League//EN`,
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    `X-WR-CALNAME:${escapeIcsText(league.name)}`,
-  ])
-  const footer = 'END:VCALENDAR'
-
-  return new Blob([[calendar, body, footer].filter(Boolean).join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+  const safeLeague = { ...league, events: league.events.map(event=>({...event,notes:league.includeNotesInShare ? event.notes : undefined})) }
+  return createMultiSportIcsBlob(customLeagueEvents(safeLeague), { reminderMinutes: [60] })
 }

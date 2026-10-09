@@ -2,6 +2,7 @@
 // Fetches source_targets, parses VEVENTs, hashes payloads, and upserts canonical events.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { authorizeMaintenance } from '../_shared/maintenance-auth.ts'
 import { externalIcsId, hashIcsEvent, parseIcsFeed, sha256Hex, type IcsFeedEvent } from '../_shared/ics-feed.ts'
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -196,6 +197,8 @@ async function upsertIcsEvent(target: SourceTarget, sportId: string, event: IcsF
 }
 
 Deno.serve(async (req) => {
+  const rejected = await authorizeMaintenance(req, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (rejected) return rejected
   const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
   const targetId = typeof body.targetId === 'string' ? body.targetId : null
   const dryRunOverride = body.dryRun === true

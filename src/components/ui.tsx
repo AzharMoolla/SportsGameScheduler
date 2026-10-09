@@ -1,3 +1,4 @@
+import { Link, type LinkProps } from 'react-router-dom'
 import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, PropsWithChildren } from 'react'
 
 // Thin shadcn-style primitives against the theme tokens. Deliberately minimal: we copy in
@@ -12,9 +13,9 @@ type ButtonVariant = 'solid' | 'ghost' | 'export' | 'subtle' | 'danger'
 // Broadcast neon carries dark text; program mode overrides filled controls to its dedicated
 // warm-paper contrast token in tailwind.css.
 const buttonStyles: Record<ButtonVariant, string> = {
-  solid: 'bg-primary text-void font-bold hover:opacity-90 shadow-[0_0_22px_color-mix(in_srgb,var(--mp-primary)_30%,transparent)]',
+  solid: 'bg-primary text-void font-bold hover:opacity-90',
   ghost: 'border border-primary/30 bg-transparent text-primary hover:bg-primary/10',
-  export: 'bg-export text-void font-bold hover:opacity-90 shadow-[0_0_22px_color-mix(in_srgb,var(--mp-export)_30%,transparent)]',
+  export: 'bg-export text-void font-bold hover:opacity-90',
   subtle: 'bg-primary/12 text-primary hover:bg-primary/20',
   danger: 'border border-flap-chg/50 bg-transparent text-flap-chg hover:bg-flap-chg/10',
 }
@@ -28,7 +29,7 @@ export function Button({
     <button
       type="button"
       className={cx(
-        'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+        'silbo-button inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
         'disabled:cursor-not-allowed disabled:opacity-50',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
         buttonStyles[variant],
@@ -37,6 +38,14 @@ export function Button({
       {...props}
     />
   )
+}
+
+export function LinkButton({ variant = 'solid', className, ...props }: LinkProps & { variant?: ButtonVariant }) {
+  return <Link className={cx(
+    'silbo-button inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+    buttonStyles[variant], className,
+  )} {...props} />
 }
 
 export function Panel({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

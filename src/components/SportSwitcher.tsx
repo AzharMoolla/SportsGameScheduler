@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAppState } from '../app/state-context'
 import { sports } from '../domain/sports'
+import { useSportActivity } from '../data/sportActivity'
 import { getTheme, withSurfaceMode } from '../theme/themes'
 import { SportAssetIcon } from './SportAssetIcon'
 
@@ -16,6 +17,8 @@ export function SportSwitcher() {
   const location = useLocation()
   const { sportKey } = useParams()
   const { surfaceMode } = useAppState()
+  const activity = useSportActivity()
+  const orderedSports = [...sports].sort((a,b) => (activity.ranked.find(item=>item.sportKey===b.canonicalSportKey)?.score ?? -1) - (activity.ranked.find(item=>item.sportKey===a.canonicalSportKey)?.score ?? -1))
   const activeKey =
     location.pathname === '/'
       ? 'neutral'
@@ -95,7 +98,9 @@ export function SportSwitcher() {
               </button>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {sports.map((sport, index) => {
+              {orderedSports.map((sport) => {
+                const index = sports.indexOf(sport)
+                const current = activity.ranked.find(item=>item.sportKey===sport.canonicalSportKey)
                 const theme = withSurfaceMode(getTheme(sport.key), surfaceMode)
                 const isActive = sport.key === activeKey
                 return (
@@ -117,7 +122,7 @@ export function SportSwitcher() {
                         CH {String(index + 1).padStart(2, '0')}
                       </span>
                       <span className="block truncate text-base font-black uppercase leading-none" style={{ color: theme.colors.primary }}>
-                        {sport.label}
+                        {current?.title === 'MLB Playoffs' ? 'Baseball · Playoffs' : sport.label}
                       </span>
                       <span className="mt-1 block truncate font-mono text-[10px] uppercase tracking-wide text-ink/60">
                         {sport.flagshipLeague}
@@ -126,12 +131,12 @@ export function SportSwitcher() {
                     <span
                       className="absolute right-2 top-2 rounded-sm px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.18em]"
                       style={
-                        sport.enabled
+                        current
                           ? { background: theme.colors.primary, color: '#0b0a08' }
                           : { background: 'color-mix(in srgb, var(--mp-text) 18%, transparent)', color: 'var(--mp-text)' }
                       }
                     >
-                      {sport.enabled ? 'ON AIR' : 'SOON'}
+                      {current ? current.title === 'MLB Playoffs' ? 'PLAYOFFS' : 'UPCOMING' : activity.loading ? 'CHECKING' : 'NO FIXTURES'}
                     </span>
                   </button>
                 )

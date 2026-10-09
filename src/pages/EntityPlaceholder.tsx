@@ -170,6 +170,7 @@ export function TeamPage() {
             {sportEmoji(competitor.sportKey)} {competitor.kind === 'person' ? 'Player' : 'Team'}
             {competitor.country ? ` · ${competitor.country}` : ''}
           </p>
+          {competitor.logoUrl && <img src={competitor.logoUrl} alt={`${competitor.name} portrait`} loading="lazy" className="mb-3 h-24 w-24 rounded-lg object-cover" />}
           <h1 className="text-2xl font-extrabold text-primary">{competitor.name}</h1>
           <p className="mt-1 text-sm text-ink/55">{events.length} upcoming · times in {prefs.timezone}</p>
         </div>

@@ -46,13 +46,13 @@ export const sports: SportInfo[] = [
     key: 'soccer',
     canonicalSportKey: 'soccer',
     label: 'Soccer',
-    flagshipLeague: 'World Cup / UEFA / EPL / La Liga',
-    leagueKey: 'wc2026',
+    flagshipLeague: 'UEFA / EPL / La Liga / International',
+    leagueKey: 'soccer',
     icon: IconBallFootball,
     badgeKey: 'soccer',
     enabled: true,
     eventNoun: 'match',
-    tagline: 'World Cup 2026 is live now',
+    tagline: 'Club matches and international football in your time',
   },
   {
     key: 'basketball',
@@ -328,7 +328,7 @@ export const customLeagueSportOptions = Array.from(
 )
 
 export function getSport(key: string): SportInfo | undefined {
-  return sportRoutes.find((sport) => sport.key === key) ?? routeAliases[key]
+  return sportRoutes.find((sport) => sport.key === key || sport.canonicalSportKey === key) ?? routeAliases[key]
 }
 
 export function canonicalSportKeyForRoute(key: string): CanonicalSportKey | undefined {

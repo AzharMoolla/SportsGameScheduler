@@ -1,8 +1,9 @@
+import { MediaCredits } from '../components/MediaCredits'
+import { AmbientBroadcastArt } from '../components/AmbientBroadcastArt'
 import { Home, ListChecks, Moon, PlusCircle, Sun, Trophy } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { AuthButton } from '../components/AuthButton'
-import { ConsentBanner } from '../components/ConsentBanner'
 import { InstallAppPrompt } from '../components/InstallAppPrompt'
 import { LanguageMenu } from '../components/LanguageMenu'
 import { LiveTicker } from '../components/LiveTicker'
@@ -11,8 +12,6 @@ import { SpotlightRail } from '../components/PosterMotifs'
 import { SilboBrandMark } from '../components/SilboMark'
 import { SportSwitcher } from '../components/SportSwitcher'
 import { dedupeSpotlightBySport, useSpotlightEvents } from '../data/spotlight'
-import { adsConfigured } from '../lib/ads'
-import { initConsent, resetConsent } from '../lib/consent'
 import { hasOnboarded } from '../lib/onboarding'
 import { useAppState } from './state-context'
 import { brand } from '../domain/brand'
@@ -138,7 +137,7 @@ const footerLinks = [
 
 function DesktopNav({ locale }: { locale?: string | null }) {
   return (
-    <nav className="hidden items-center gap-1 justify-self-center md:flex">
+    <nav aria-label="Main navigation" className="hidden items-center gap-1 justify-self-center md:flex">
       <SportSwitcher />
       {desktopNavItems.map(({ to, labelKey, icon: Icon }) => (
         <NavLink
@@ -218,7 +217,7 @@ function BrandBlock() {
         </span>
       </span>
       <span className="min-w-0">
-        <span className="neon-text block truncate whitespace-nowrap font-display text-[1rem] leading-none tracking-wide min-[390px]:text-lg sm:text-2xl">
+        <span className="neon-text block whitespace-nowrap font-display text-[1rem] leading-none tracking-wide min-[390px]:text-lg sm:text-2xl">
           Silbo Sports
         </span>
         <span className="hidden max-w-[18rem] truncate font-mono text-[10px] uppercase tracking-[0.18em] text-ink/45 lg:block">
@@ -248,14 +247,11 @@ export function AppShell() {
         ? 'custom'
         : sportKey && getSport(sportKey)
           ? sportKey
-          : 'soccer',
+          : 'neutral',
   )
   const theme = withSurfaceMode(baseTheme, surfaceMode)
   const programMode = surfaceMode === 'program'
   const pageScene = pageSceneForPath(location.pathname)
-
-  // Restore the AdSense script if the user accepted advertising in a previous session.
-  useEffect(() => initConsent(), [])
 
   useEffect(() => {
     const root = document.documentElement
@@ -366,6 +362,7 @@ export function AppShell() {
     <SportThemeProvider theme={theme}>
       <div className={`app-scene-${pageScene} min-h-svh bg-page text-ink motif-${theme.motifs.background}`}>
         <div className="broadcast-air" aria-hidden="true">
+          <AmbientBroadcastArt />
           <span className="crt-side-signal crt-side-signal-left">
             <CrtSignalTraces />
             <span className="crt-pixel crt-pixel-cyan" />
@@ -383,6 +380,7 @@ export function AppShell() {
         </div>
         {/* PERF: no backdrop-blur on the sticky header — blur over a fixed gradient forces a
             full-viewport recomposite on every scroll frame. Near-opaque surface instead. */}
+        <a href="#main-content" className="silbo-skip-link">Skip to content</a>
         <header className="sticky top-0 z-40 border-b border-primary/15 bg-surface/95">
           <div className="mx-auto grid w-full max-w-[1460px] grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 px-2.5 py-2.5 sm:gap-4 sm:px-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
             <BrandBlock />
@@ -405,10 +403,10 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className={`page-scene page-scene-${pageScene} relative z-[1] isolate mx-auto w-full max-w-[1460px] px-4 pb-28 pt-5 md:py-6`}>
+        <main id="main-content" tabIndex={-1} className={`page-scene page-scene-${pageScene} relative z-[1] isolate mx-auto w-full max-w-[1460px] px-4 pb-28 pt-5 md:py-6`}>
           <PageAtmosphere scene={pageScene} />
           <div className="page-scene-content relative z-[1]">
-            <LiveTicker />
+            {pageScene === 'home' && <LiveTicker />}
             <Outlet />
           </div>
         </main>
@@ -430,23 +428,15 @@ export function AppShell() {
                     {item.label}
                   </Link>
                 ))}
-                {adsConfigured && (
-                  <button
-                    type="button"
-                    onClick={() => resetConsent()}
-                    className="text-ink/58 transition-colors hover:text-primary"
-                  >
-                    Cookie settings
-                  </button>
-                )}
               </nav>
             </div>
           </div>
+          <MediaCredits />
+          <p className="mt-3 text-xs text-ink/60">Public beta: coverage varies by sport and country. Email and push delivery remain paused; use calendar reminders.</p>
         </footer>
 
         <MobileNav locale={prefs.locale} />
         <InstallAppPrompt />
-        <ConsentBanner />
         {showOnboarding && onboardingEligible && <Onboarding onClose={() => setShowOnboarding(false)} />}
       </div>
     </SportThemeProvider>

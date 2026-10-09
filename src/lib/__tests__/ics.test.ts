@@ -73,7 +73,7 @@ describe('createMultiSportIcsBlob', () => {
 
   test('renders secondary provider sports with categories', async () => {
     const ics = await render([makeEvent({ sportKey: 'baseball', leagueName: 'MLB', title: 'Blue Jays vs Yankees' })])
-    expect(ics).toContain('SUMMARY:BSB Blue Jays vs Yankees')
+    expect(ics).toContain('SUMMARY:⚾ Blue Jays vs Yankees')
     expect(ics).toContain('CATEGORIES:Baseball,MLB')
   })
 

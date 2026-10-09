@@ -1,3 +1,4 @@
+import { inScheduleRange } from '../lib/scheduleRange'
 import {
   BellRing,
   CalendarCheck,
@@ -17,23 +18,23 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useAppState } from '../app/state-context'
 import { AlertOptInNudge } from '../components/AlertOptInNudge'
 import { CityPicker } from '../components/CityPicker'
-import { Button, EmptyState, Panel, PanelHeading } from '../components/ui'
+import { Button, LinkButton, EmptyState, Panel, PanelHeading } from '../components/ui'
 import { filterMatchesForTeams, useMatches } from '../data/liveMatches'
-import { useMyEvents } from '../data/liveSport'
-import { allMatches, groupMatches } from '../data/worldcup'
+import { usePersonalEvents as useMyEvents } from '../data/personalSchedule'
+import { eventToMatch } from '../lib/scheduleAdapter'
 import type { Match } from '../domain/match'
 import { getSavedMatchKeys } from '../lib/store'
 import { brand, exportFilename } from '../domain/brand'
 import { cityLabelFor } from '../lib/cities'
 import { copyToClipboard, downloadBlob } from '../lib/clipboard'
 import { buildExportAdvice, type ExportAdvice, type ExportAdviceMethod } from '../lib/exportAdvice'
-import { createIcsBlob, createMultiSportIcsBlob, sportEmoji } from '../lib/ics'
+import { createMultiSportIcsBlob, sportEmoji } from '../lib/ics'
 import { t } from '../lib/i18n'
 import { createMultiSportNotesText, createNotesText } from '../lib/notes'
 import { MAX_EVENTS_BY_TEMPLATE, paginateEvents, type ExportTemplate } from '../lib/paginate'
@@ -50,7 +51,7 @@ type FlowState = { flowId: GuidedFlowId | null; stepIndex: number; answers: Reco
 type StepOption = { id: string; label: string; description?: string; recommended?: boolean }
 type FlowStep = { id: string; question: string; options?: StepOption[]; final?: boolean }
 type FlowConfig = { title: string; steps: FlowStep[] }
-type ReviewTargetType = 'team' | 'league' | 'competitor'
+type ReviewTargetType = 'team' | 'league' | 'competitor' | 'event' | 'custom_league'
 type ReviewPick = { targetType: ReviewTargetType; targetId: string; label: string; group: string; count: number }
 type PreviewItem = {
   id: string
@@ -134,7 +135,6 @@ const guidedFlows: Record<GuidedFlowId, FlowConfig> = {
         options: [
           { id: 'all_saved', label: 'All saved matches', description: 'Everything you follow in My Schedule.', recommended: true },
           { id: 'visible_matches', label: 'Visible matches', description: 'Only the schedule currently shown on this page.' },
-          { id: 'full_tournament', label: 'Full World Cup', description: 'Every available World Cup match.' },
         ],
       },
       {
@@ -174,7 +174,6 @@ const guidedFlows: Record<GuidedFlowId, FlowConfig> = {
         options: [
           { id: 'all_saved', label: 'All saved matches', recommended: true },
           { id: 'visible_matches', label: 'Visible matches' },
-          { id: 'full_tournament', label: 'Full World Cup' },
         ],
       },
       { id: 'download_confirm', question: 'Ready to download', final: true },
@@ -189,7 +188,6 @@ const guidedFlows: Record<GuidedFlowId, FlowConfig> = {
         options: [
           { id: 'all_saved', label: 'All saved matches', recommended: true },
           { id: 'visible_matches', label: 'Visible matches' },
-          { id: 'world_cup_only', label: 'World Cup picks only' },
         ],
       },
       {
@@ -201,32 +199,13 @@ const guidedFlows: Record<GuidedFlowId, FlowConfig> = {
           { id: '1_day', label: '1 day before' },
         ],
       },
-      { id: 'reminder_confirm', question: 'Ready to turn on reminders', final: true },
+      { id: 'reminder_confirm', question: 'Download a calendar with reminders', final: true },
     ],
   },
   settings: {
     title: 'Schedule settings',
     steps: [{ id: 'settings_confirm', question: 'Tune how your schedule displays', final: true }],
   },
-}
-
-function inRange(date: Date, range: RangeKey, nowMs: number): boolean {
-  if (range === 'all') return true
-  const now = new Date(nowMs)
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  if (range === 'today') {
-    const end = new Date(startOfDay.getTime() + 24 * 3600_000)
-    return date >= startOfDay && date < end
-  }
-  if (range === 'week') {
-    const end = new Date(startOfDay.getTime() + 7 * 24 * 3600_000)
-    return date >= startOfDay && date < end
-  }
-  const day = now.getDay()
-  const daysUntilSaturday = day === 0 ? -1 : 6 - day
-  const saturday = new Date(startOfDay.getTime() + daysUntilSaturday * 24 * 3600_000)
-  const monday = new Date(saturday.getTime() + 2 * 24 * 3600_000)
-  return date >= saturday && date < monday
 }
 
 function dateRangeLabel(dates: Date[], timeZone: string, locale?: string | null, hour12?: boolean | null) {
@@ -292,7 +271,7 @@ function CompactScheduleRow({
 }
 
 export function MySchedulePage() {
-  const { followedTeams, followedLeagueIds, followedCompetitorIds, prefs, surfaceMode } = useAppState()
+  const { followedTeams, followedLeagueIds, followedCompetitorIds, followedEventIds, prefs, surfaceMode } = useAppState()
   const [range, setRange] = useState<RangeKey>('all')
   const [hidePast, setHidePast] = useState(true)
   // Individually-saved matches (read once on mount; "Add to schedule" elsewhere persists them).
@@ -327,16 +306,29 @@ export function MySchedulePage() {
     () => followedCompetitorIds.filter((id) => !hiddenKeys.has(reviewKey({ targetType: 'competitor', targetId: id }))),
     [followedCompetitorIds, hiddenKeys],
   )
-  const myEvents = useMyEvents(activeFollowedLeagueIds, activeFollowedCompetitorIds)
-  const hasLiveFollows = activeFollowedLeagueIds.length > 0 || activeFollowedCompetitorIds.length > 0
+  const personalEvents = useMyEvents(activeFollowedLeagueIds, activeFollowedCompetitorIds, followedEventIds.filter(id=>!hiddenKeys.has(`event:${id}`)))
+  const includedEvents = useMemo(()=>personalEvents.events.filter(event=>!hiddenKeys.has(`custom_league:${event.metadata?.custom_league_id}`) && !hiddenKeys.has(`event:${event.id}`)),[personalEvents.events,hiddenKeys])
+  const myEvents = useMemo(() => ({ ...personalEvents, events: includedEvents }), [personalEvents, includedEvents])
+  const hasLiveFollows = activeFollowedLeagueIds.length > 0 || activeFollowedCompetitorIds.length > 0 || followedEventIds.length > 0 || myEvents.events.some(event=>event.metadata?.custom_league_id)
 
+  const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!flow.flowId) return
+    const opener = document.activeElement as HTMLElement | null
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const controls = () => [...(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], textarea:not(:disabled)') ?? [])].filter(node => node.offsetParent !== null)
+    const frame = requestAnimationFrame(() => controls()[0]?.focus())
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Tab') {
+        const items = controls(); const first = items[0]; const last = items.at(-1)
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+      }
       if (event.key === 'Escape') setFlow({ flowId: null, stepIndex: 0, answers: {} })
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => { cancelAnimationFrame(frame); document.body.style.overflow = overflow; window.removeEventListener('keydown', onKeyDown); opener?.focus() }
   }, [flow.flowId])
 
   useEffect(() => {
@@ -362,20 +354,15 @@ export function MySchedulePage() {
     return baseMatches
       .filter(
         (match) =>
-          inRange(match.startsAt, range, nowMs) &&
+          inScheduleRange(match.startsAt, range, nowMs, timeZone) &&
           (!hidePast || match.startsAt.getTime() > nowMs - 2 * 3600_000),
       )
       .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
-  }, [baseMatches, range, hidePast, nowMs])
+  }, [baseMatches, range, hidePast, nowMs, timeZone])
 
   const savedWorldCupSchedule = useMemo(
     () => [...baseMatches].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime()),
     [baseMatches],
-  )
-
-  const fullWorldCupSchedule = useMemo(
-    () => [...matches].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime()),
-    [matches],
   )
 
   const liveSchedule = useMemo(
@@ -384,11 +371,11 @@ export function MySchedulePage() {
         .filter(
           (event) =>
             event.startsAt &&
-            inRange(event.startsAt, range, nowMs) &&
+            inScheduleRange(event.startsAt, range, nowMs, timeZone) &&
             (!hidePast || event.startsAt.getTime() > nowMs - 2 * 3600_000),
         )
         .sort((a, b) => (a.startsAt?.getTime() ?? 0) - (b.startsAt?.getTime() ?? 0)),
-    [myEvents.events, range, hidePast, nowMs],
+    [myEvents.events, range, hidePast, nowMs, timeZone],
   )
 
   const allVisibleDates = useMemo(
@@ -408,24 +395,24 @@ export function MySchedulePage() {
   }, [schedule, liveSchedule])
 
   const totalVisible = schedule.length + liveSchedule.length
-  const followCount = activeFollowedTeams.length + activeFollowedLeagueIds.length + activeFollowedCompetitorIds.length
-  const tbdSlotCount = allMatches.length - groupMatches.length
+  const followCount = activeFollowedTeams.length + activeFollowedLeagueIds.length + activeFollowedCompetitorIds.length + followedEventIds.length
+  const tbdSlotCount = myEvents.events.filter(event => event.startsAtTbd).length
   const activeFlow = flow.flowId ? guidedFlows[flow.flowId] : null
   const currentStep = activeFlow?.steps[flow.stepIndex]
   const currentAnswer = currentStep ? flow.answers[currentStep.id] : undefined
 
   const selectedTeamsSummary =
     activeFollowedTeams.length === 0
-      ? 'No World Cup teams yet'
+      ? 'Saved sports and community events'
       : activeFollowedTeams.length <= 4
         ? activeFollowedTeams.join(', ')
         : `${activeFollowedTeams.slice(0, 4).join(', ')} +${activeFollowedTeams.length - 4}`
 
-  const liveStatus = myEvents.loading
+  const liveStatus = myEvents.error ?? (myEvents.loading
     ? 'Checking live sports data...'
     : hasLiveFollows
       ? 'Live follows read from Silbo DB'
-      : 'World Cup picks stored on this device'
+      : 'Selections stored on this device')
 
   const followCounts = useMemo(
     () => activeFollowedTeams.map((team) => ({ team, count: filterMatchesForTeams(matches, [team]).length })),
@@ -467,11 +454,13 @@ export function MySchedulePage() {
       })
 
     return [
-      ...followCounts.map(({ team, count }) => ({ targetType: 'team' as const, targetId: team, label: team, group: 'World Cup', count })),
+      ...followCounts.map(({ team, count }) => ({ targetType: 'team' as const, targetId: team, label: team, group: 'Soccer archive', count })),
       ...leaguePicks,
       ...competitorPicks,
+      ...myEvents.events.filter(event=>followedEventIds.includes(event.id)).map(event=>({targetType:'event' as const,targetId:event.id,label:event.title,group:'Saved events',count:1})),
+      ...[...new Map(myEvents.events.filter(event=>event.metadata?.custom_league_id).map(event=>[String(event.metadata!.custom_league_id),event])).values()].map(event=>({targetType:'custom_league' as const,targetId:String(event.metadata!.custom_league_id),label:event.leagueName,group:'Community',count:myEvents.events.filter(item=>item.leagueId===event.leagueId).length})),
     ]
-  }, [activeFollowedCompetitorIds, activeFollowedLeagueIds, followCounts, myEvents.events])
+  }, [activeFollowedCompetitorIds, activeFollowedLeagueIds, followedEventIds, followCounts, myEvents.events])
 
   const reviewGroups = useMemo(() => {
     const groups = new Map<string, ReviewPick[]>()
@@ -487,11 +476,11 @@ export function MySchedulePage() {
     const worldCupItems: PreviewItem[] = schedule.map((match) => ({
       id: `wc:${match.date}:${match.team1}:${match.team2}`,
       title: `${match.team1} vs ${match.team2}`,
-      subtitle: ['World Cup', match.group || match.round].filter(Boolean).join(' - '),
+      subtitle: ['Soccer archive', match.group || match.round].filter(Boolean).join(' - '),
       startsAt: match.startsAt,
       venue: match.ground,
       sportKey: 'soccer',
-      searchable: `${match.team1} ${match.team2} ${match.group ?? ''} ${match.round} ${match.ground} World Cup`,
+      searchable: `${match.team1} ${match.team2} ${match.group ?? ''} ${match.round} ${match.ground} Soccer archive`,
       match,
     }))
     const liveItems: PreviewItem[] = liveSchedule.map((event) => ({
@@ -545,9 +534,9 @@ export function MySchedulePage() {
   }
 
   function matchesForScope(scope = 'all_saved') {
-    if (scope === 'visible_matches') return schedule
-    if (scope === 'full_tournament') return fullWorldCupSchedule
-    return savedWorldCupSchedule
+    const live = scope === 'visible_matches' ? liveSchedule : myEvents.events
+    const legacy = scope === 'visible_matches' ? schedule : savedWorldCupSchedule
+    return [...legacy, ...live.filter(event => event.startsAt).map(eventToMatch)].sort((a,b) => a.startsAt.getTime()-b.startsAt.getTime())
   }
 
   function pageCountForScope(scope = 'all_saved') {
@@ -555,18 +544,18 @@ export function MySchedulePage() {
     return pages.length
   }
 
-  async function exportIcs(matchesToExport = schedule) {
-    downloadBlob(createIcsBlob(matchesToExport, timeZone, prefs.locale, prefs.hour12), exportFilename('schedule', 'ics'))
+  async function exportIcs(matchesToExport = matchesForScope('visible_matches')) {
+    downloadBlob(createMultiSportIcsBlob(matchesToExport.map(match => match.exportEvent ?? { id: match.id ?? `${match.date}-${match.team1}-${match.team2}`, title: `${match.team1} vs ${match.team2}`, startsAt: match.startsAt, startsAtTbd: false, status: 'scheduled', leagueId: null, leagueName: match.round, sportKey: 'soccer', venue: match.ground }), { reminderMinutes: [60] }), exportFilename('schedule', 'ics'))
     setMessage(exportCompletionMessage('ics'))
   }
 
-  async function exportCsv(matchesToExport = schedule) {
+  async function exportCsv(matchesToExport = matchesForScope('visible_matches')) {
     const csv = createScheduleCsv(matchesToExport, timeZone, prefs.locale, prefs.hour12)
     downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), exportFilename('schedule', 'csv'))
     setMessage(exportCompletionMessage('csv'))
   }
 
-  async function exportImages(share: boolean, matchesToExport = schedule) {
+  async function exportImages(share: boolean, matchesToExport = matchesForScope('visible_matches')) {
     let pageNumber = 1
     const exportPages = paginateEvents(matchesToExport, template)
     for (const pageEvents of exportPages) {
@@ -600,7 +589,7 @@ export function MySchedulePage() {
     setMessage(exportCompletionMessage(exportPages.length > 1 ? 'images' : 'image', exportPages.length))
   }
 
-  async function exportPdf(matchesToExport = schedule) {
+  async function exportPdf(matchesToExport = matchesForScope('visible_matches')) {
     let pageNumber = 1
     const exportPages = paginateEvents(matchesToExport, template)
     const pdfPages = []
@@ -626,7 +615,7 @@ export function MySchedulePage() {
     setMessage(exportCompletionMessage('pdf', pdfPages.length))
   }
 
-  async function copyNotes(matchesToExport = schedule) {
+  async function copyNotes(matchesToExport = matchesForScope('visible_matches')) {
     const text = createNotesText(matchesToExport, activeFollowedTeams, timeZone, cityLabel, prefs.locale, prefs.hour12)
     await copyToClipboard(text)
     setMessage(exportCompletionMessage('notes'))
@@ -638,7 +627,7 @@ export function MySchedulePage() {
     setMessage(`All-sports text schedule copied - ${liveSchedule.length} events.`)
   }
 
-  async function shareSchedule(matchesToExport = schedule) {
+  async function shareSchedule(matchesToExport = matchesForScope('visible_matches')) {
     const text = createNotesText(matchesToExport, activeFollowedTeams, timeZone, cityLabel, prefs.locale, prefs.hour12)
     if (navigator.share) {
       await navigator.share({ title: brand.scheduleTitle, text })
@@ -718,7 +707,10 @@ export function MySchedulePage() {
       '1 hour before',
     )
     setReminderSummary(`${scope}, ${timing.toLowerCase()}`)
-    setMessage('Reminder preference noted. The notification setup page still controls delivery channels.')
+    const minutes = flow.answers.reminder_timing === '15_minutes' ? 15 : flow.answers.reminder_timing === '1_day' ? 1440 : 60
+    const events = (flow.answers.reminder_scope === 'visible_matches' ? liveSchedule : myEvents.events)
+    downloadBlob(createMultiSportIcsBlob(events, { reminderMinutes: [minutes] }), exportFilename('reminders', 'ics'))
+    setMessage('Calendar downloaded with reminders. Import it into your calendar to receive them. Email and push alerts are not enabled.')
   }
 
   function finalActionLabel() {
@@ -734,7 +726,7 @@ export function MySchedulePage() {
       if (intent === 'share_copy') return 'Share schedule'
       return 'Download PDF'
     }
-    if (flow.flowId === 'reminders') return 'Enable reminders'
+    if (flow.flowId === 'reminders') return 'Download reminder calendar'
     return 'Save settings'
   }
 
@@ -764,15 +756,15 @@ export function MySchedulePage() {
   }
 
   function finalSelectionSummary() {
-    if (flow.flowId === 'download') return `${matchesForScope(flow.answers.download_scope).length} World Cup matches selected.`
+    if (flow.flowId === 'download') return `${matchesForScope(flow.answers.download_scope).length} events selected.`
     if (flow.flowId === 'calendar') {
       if ((flow.answers.calendar_update_mode ?? 'live_subscription') === 'live_subscription') {
         const liveFollowCount = activeFollowedLeagueIds.length + activeFollowedCompetitorIds.length
         return liveFollowCount
           ? `${liveFollowCount} followed leagues/players included in the live feed.`
-          : 'No live league/player follows yet. Use a one-time ICS for World Cup team picks.'
+          : 'No live league/player follows yet. Use a one-time ICS for saved events.'
       }
-      return `${matchesForScope(flow.answers.calendar_scope).length} World Cup matches selected.`
+      return `${matchesForScope(flow.answers.calendar_scope).length} events selected.`
     }
     return `${totalVisible} visible events in ${cityLabel}.`
   }
@@ -824,18 +816,14 @@ export function MySchedulePage() {
 
   const currentBestFitAdvice = currentStep?.final ? bestFitAdvice() : null
 
-  if (followedTeams.length === 0 && followedLeagueIds.length === 0 && followedCompetitorIds.length === 0 && savedMatchKeys.length === 0) {
+  if (followedTeams.length === 0 && followedLeagueIds.length === 0 && followedCompetitorIds.length === 0 && followedEventIds.length === 0 && savedMatchKeys.length === 0 && myEvents.events.length === 0) {
     return (
       <EmptyState
         title={t('schedule.emptyTitle', undefined, prefs.locale)}
         body={t('schedule.emptyBody', undefined, prefs.locale)}
       >
-        <Link to="/sports/soccer">
-          <Button>{t('schedule.pickWorldCup', undefined, prefs.locale)}</Button>
-        </Link>
-        <Link to="/explore">
-          <Button variant="ghost">{t('home.exploreSports', undefined, prefs.locale)}</Button>
-        </Link>
+        <LinkButton to="/sports/soccer">Browse soccer</LinkButton>
+        <LinkButton to="/explore" variant="ghost">{t('home.exploreSports', undefined, prefs.locale)}</LinkButton>
       </EmptyState>
     )
   }
@@ -878,6 +866,7 @@ export function MySchedulePage() {
             onDoubleClick={closeFlow}
           />
           <section
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-label={activeFlow.title}
@@ -898,13 +887,13 @@ export function MySchedulePage() {
 
             {!currentStep.final && currentStep.options && (
               <div className="space-y-2">
-                {currentStep.options.map((option) => {
+                {currentStep.options.filter(option=>currentStep.id!=='calendar_scope' || flow.answers.calendar_update_mode!=='live_subscription' || option.id==='all_saved').map((option) => {
                   const selected = (currentAnswer || defaultAnswer(currentStep)) === option.id
                   const liveSyncUnavailable =
                     currentStep.id === 'calendar_update_mode' && option.id === 'live_subscription' && !hasLiveFollows
                   const recommended = Boolean(option.recommended && !liveSyncUnavailable)
                   const description = liveSyncUnavailable
-                    ? 'Follow a live league or player first. World Cup team picks can be added once with an ICS file.'
+                    ? 'Save an event, follow a league or player, or create a community schedule first.'
                     : option.description
                   return (
                     <button
@@ -1153,6 +1142,7 @@ export function MySchedulePage() {
                 <input
                   value={previewQuery}
                   onChange={(event) => setPreviewQuery(event.target.value)}
+                  aria-label="Search your schedule"
                   placeholder="Search matches, teams, leagues"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink/40"
                 />
@@ -1300,7 +1290,7 @@ export function MySchedulePage() {
       <div className="flex flex-wrap items-center gap-3 rounded-card border border-dashed border-flap-tbd/50 bg-flap-tbd/8 px-4 py-3">
         <span className="flap flap-tbd shrink-0">{t('schedule.tbdDates', undefined, prefs.locale)}</span>
         <p className="min-w-0 flex-1 text-sm text-ink/70">
-          {t('schedule.tbdBody', { count: tbdSlotCount }, prefs.locale)}
+          {tbdSlotCount ? `${tbdSlotCount} selected events still have provisional times.` : 'Saved events and followed leagues appear here. Live calendar URLs update as fixtures change.'}
         </p>
       </div>
     </div>

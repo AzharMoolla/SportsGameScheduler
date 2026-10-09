@@ -26,7 +26,7 @@ type LeagueRow = {
   share_enabled: boolean
   include_notes_in_share: boolean
   created_at: string
-  payload: { sportKey?: string; teams?: CustomTeam[]; events?: CustomEvent[] } | null
+  payload: { image?: CustomLeague['image']; sportKey?: string; teams?: CustomTeam[]; events?: CustomEvent[] } | null
 }
 
 function rowToLeague(row: LeagueRow): CustomLeague {
@@ -40,6 +40,7 @@ function rowToLeague(row: LeagueRow): CustomLeague {
     publicToken: row.public_token,
     shareEnabled: row.share_enabled,
     includeNotesInShare: row.include_notes_in_share,
+    image: payload.image,
     teams: payload.teams ?? [],
     events: payload.events ?? [],
     createdAt: row.created_at,
@@ -56,25 +57,28 @@ function leagueToRow(userId: string, league: CustomLeague) {
     public_token: league.publicToken,
     share_enabled: league.shareEnabled,
     include_notes_in_share: league.includeNotesInShare,
-    payload: { sportKey: league.sportKey, teams: league.teams, events: league.events, createdAt: league.createdAt },
+    payload: { image: league.image, sportKey: league.sportKey, teams: league.teams, events: league.events, createdAt: league.createdAt },
   }
 }
 
 export async function loadRemoteLeagues(supabase: SupabaseClient, userId: string): Promise<CustomLeague[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('custom_leagues')
     .select('id, name, timezone, location, public_token, share_enabled, include_notes_in_share, created_at, payload')
     .eq('owner_user_id', userId)
     .order('created_at', { ascending: false })
+  if (error) throw error
   return ((data ?? []) as LeagueRow[]).map(rowToLeague)
 }
 
 export async function upsertRemoteLeague(supabase: SupabaseClient, userId: string, league: CustomLeague): Promise<void> {
-  await supabase.from('custom_leagues').upsert(leagueToRow(userId, league), { onConflict: 'id' })
+  const { error } = await supabase.from('custom_leagues').upsert(leagueToRow(userId, league), { onConflict: 'id' })
+  if (error) throw error
 }
 
 export async function deleteRemoteLeague(supabase: SupabaseClient, id: string): Promise<void> {
-  await supabase.from('custom_leagues').delete().eq('id', id)
+  const { error } = await supabase.from('custom_leagues').delete().eq('id', id)
+  if (error) throw error
 }
 
 // Public share resolver (gated on share_enabled, server-side). Works without login.
@@ -94,6 +98,7 @@ export async function loadSharedLeague(supabase: SupabaseClient, token: string):
     publicToken: token,
     shareEnabled: true,
     includeNotesInShare: row.include_notes_in_share,
+    image: payload.image,
     teams: payload.teams ?? [],
     events: payload.events ?? [],
     createdAt: '',
@@ -106,6 +111,7 @@ export function useCustomLeagues() {
   const { auth } = useAppState()
   const userId = auth.user?.id
   const [leagues, setLeagues] = useState<CustomLeague[]>(() => getCustomLeagues())
+  const [syncError, setSyncError] = useState('')
 
   useEffect(() => {
     // Signed out: the local list (initialized from localStorage) stands as-is.
@@ -117,7 +123,7 @@ export function useCustomLeagues() {
       if (cancelled) return
       saveCustomLeagues(merged)
       setLeagues(merged)
-    })
+    }).catch(() => { if (!cancelled) setSyncError('Account sync failed. Your device copy is still available.') })
     return () => {
       cancelled = true
     }
@@ -127,7 +133,7 @@ export function useCustomLeagues() {
     (league: CustomLeague) => {
       upsertLocalLeague(league)
       setLeagues(getCustomLeagues())
-      if (userId) getSupabaseClient().then((supabase) => supabase && upsertRemoteLeague(supabase, userId, league))
+      if (userId) getSupabaseClient().then((supabase) => supabase && upsertRemoteLeague(supabase, userId, league)).catch(() => setSyncError('Saved on this device, but account sync failed.'))
     },
     [userId],
   )
@@ -136,12 +142,12 @@ export function useCustomLeagues() {
     (id: string) => {
       deleteLocalLeague(id)
       setLeagues(getCustomLeagues())
-      if (userId) getSupabaseClient().then((supabase) => supabase && deleteRemoteLeague(supabase, id))
+      if (userId) getSupabaseClient().then((supabase) => supabase && deleteRemoteLeague(supabase, id)).catch(() => setSyncError('Deleted on this device, but account deletion failed.'))
     },
     [userId],
   )
 
-  return { leagues, save, remove, signedIn: Boolean(userId) }
+  return { leagues, save, remove, syncError, signedIn: Boolean(userId) }
 }
 
 // On sign-in: push any local leagues not yet on the account, then return the unified set.
@@ -154,9 +160,10 @@ export async function mergeLeaguesOnSignIn(
   const remoteIds = new Set(remote.map((l) => l.id))
   const localOnly = localLeagues.filter((l) => !remoteIds.has(l.id))
   if (localOnly.length) {
-    await supabase
+    const { error } = await supabase
       .from('custom_leagues')
       .upsert(localOnly.map((l) => leagueToRow(userId, l)), { onConflict: 'id' })
+    if (error) throw error
   }
   return [...localOnly, ...remote]
 }

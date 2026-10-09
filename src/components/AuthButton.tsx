@@ -26,17 +26,6 @@ export function AuthButton() {
     }
   }
 
-  async function signInGoogle() {
-    setBusy(true)
-    setMessage('')
-    try {
-      await auth.signInWithGoogle()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not start Google sign-in.')
-      setBusy(false)
-    }
-  }
-
   if (!auth.configured) {
     return (
       <Button
@@ -103,10 +92,6 @@ export function AuthButton() {
                 <Mail size={15} /> Send magic link
               </Button>
             </form>
-
-            <Button className="mt-2 w-full" variant="ghost" onClick={signInGoogle} disabled={busy}>
-              <LogIn size={15} /> Continue with Google
-            </Button>
 
             {message && <p className="mt-3 text-sm font-medium text-primary">{message}</p>}
           </div>
