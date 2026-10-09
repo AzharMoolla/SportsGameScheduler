@@ -9,7 +9,7 @@ describe('Supabase auth email templates', () => {
   ])('%s keeps auth tokens and CRT fallbacks intact', (_file, html) => {
     expect(html).toContain('<!doctype html>')
     expect(html.match(/{{ \.ConfirmationURL }}/g)?.length).toBeGreaterThanOrEqual(2)
-    expect(html).toContain('content="light only"')
+    expect(html).toContain('content="light dark"')
     expect(html).toContain('background-color:#f3eddd')
     expect(html).toContain('background-color:#171b18')
     expect(html).toContain('#54ff9f')
@@ -18,5 +18,7 @@ describe('Supabase auth email templates', () => {
     expect(html).toContain('#f0b93f')
     expect(html).toContain('class="primary-button"')
     expect(html).toContain('@media only screen and (max-width:480px)')
+    expect(html).not.toContain('fonts.googleapis.com')
+    expect(html).toContain('My schedule')
   })
 })

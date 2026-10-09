@@ -13,6 +13,7 @@ import {
   type SurfaceMode,
 } from '../lib/store'
 import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase'
+import { SIGN_IN_PROVIDERS, type SignInProvider } from '../lib/authProviders'
 import {
   isDbFollow,
   mergeFollowsOnSignIn,
@@ -152,12 +153,13 @@ export function AppStateProvider({ children }: PropsWithChildren) {
     if (error) throw error
   }, [])
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithProvider = useCallback(async (provider: SignInProvider) => {
+    if (!SIGN_IN_PROVIDERS.some((option) => option.id === provider)) throw new Error('Unsupported sign-in provider')
     const supabase = await getSupabaseClient()
     if (!supabase) throw new Error('Supabase is not configured')
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
+      provider,
+      options: { redirectTo: window.location.origin, ...(provider === 'azure' ? { scopes: 'email' } : {}) },
     })
     if (error) throw error
   }, [])
@@ -185,7 +187,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
         user,
         configured: isSupabaseConfigured,
         signInWithMagicLink,
-        signInWithGoogle,
+        signInWithProvider,
         signOut,
       },
     }),
@@ -199,7 +201,7 @@ export function AppStateProvider({ children }: PropsWithChildren) {
       prefs,
       systemSurfaceMode,
       setPrefs,
-      signInWithGoogle,
+      signInWithProvider,
       signInWithMagicLink,
       signOut,
       toggleFollow,

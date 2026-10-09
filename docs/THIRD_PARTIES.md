@@ -19,3 +19,5 @@
 | Stripe | Possible future support/premium billing | Planned only; no current payment integration or subscription promises. |
 
 Ads and affiliate UI/configuration were removed locally; this has not been deployed. No analytics or tracking provider was added. Re-audit network requests when the restored app is running.
+
+2026-10-09: the frontend was published on October 9 (superseding historical restoration-only status above). Google/Apple/Microsoft sign-in is prepared but disabled. Choosing an enabled provider sends account identity through that provider and Supabase; no provider SDK/tracker runs before selection. Owner authorized a separate Google project; consent/credentials await owner completion. Auth SMTP is disabled, so Resend event credentials alone do not enable public magic links. Templates remove external font requests and use first-party brand imagery. Event delivery remains paused. See [account/message evidence](auth-and-messages-2026-10-09.md).

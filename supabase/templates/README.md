@@ -1,53 +1,27 @@
-# Silbo email templates
+# Silbo account and event messages
 
-Two kinds of email leave Silbo, both delivered through the **Resend SMTP** configured in Supabase:
+Updated 2026-10-09. The five auth templates are **prepared locally**, not installed on the restored project. Its dashboard requires custom SMTP before template editing; SMTP is currently disabled. Older deployment dates referred to the deleted project.
 
-| Email | Sent by | Template source | Action needed |
-|---|---|---|---|
-| **Magic link / sign-in** | Supabase Auth | `magic-link.html` (this folder) | None — installed remotely 2026-07-02; re-push after edits ↓ |
-| **Confirm signup** | Supabase Auth | `confirm-signup.html` (this folder) | None — installed remotely 2026-07-02; re-push after edits ↓ |
-| **Schedule alerts / reminders** | `notifications` edge function | `supabase/functions/_shared/email-template.ts` (`renderSilboAlertEmail`) | None — already branded & deployed with the function |
+Generate auth HTML and the credential-free partial Management API payload with `node scripts/generate-auth-email-templates.mjs`. Preview auth and sample event messages with `node scripts/preview-email-templates.mjs`, then open `/docs/previews/emails/index.html` on the local Vite server. Samples are explicitly labelled; they do not assert actual fixtures or broadcasts.
 
-The alert/reminder emails are rendered in code and sent via the Resend API directly, so they need no
-dashboard step. Only the **Auth** emails (magic link, confirm signup) live in Supabase Auth config.
+| Template | Subject | Action |
+| --- | --- | --- |
+| magic-link.html | Your sign-in link — Silbo Sports | One-time sign-in |
+| confirm-signup.html | Confirm your email — Silbo Sports | Verify a new account |
+| email-change.html | Confirm your email change — Silbo Sports | Confirm an email change |
+| invite.html | Your invitation — Silbo Sports | Accept an invitation |
+| reauthentication.html | Your verification code — Silbo Sports | Display the one-time code |
 
-## How to install / update the Auth templates
+Use only project `bgbkqxdsjnbsizwkslsr` on Silbo Hosting. Configure an existing verified Resend sender through Supabase → Authentication → Emails → SMTP Settings. Host `smtp.resend.com`, port `465`, username `resend`; the owner enters the API key directly in the SMTP password field. Never copy keys into chat or this repository. Keep link/click tracking disabled for authentication messages. Sender verification and actual delivery still need owner verification.
 
-**Option A — Management API (no dashboard needed).** `PATCH https://api.supabase.com/v1/projects/<ref>/config/auth`
-with a `sbp_…` personal access token (the Supabase CLI login token works), setting only these keys:
-- `mailer_subjects_magic_link` / `mailer_templates_magic_link_content`
-- `mailer_subjects_confirmation` / `mailer_templates_confirmation_content`
+After SMTP setup, install the matching subject/body for each template in Authentication → Emails. Alternatively, submit `auth-config.json` as a partial PATCH to `https://api.supabase.com/v1/projects/bgbkqxdsjnbsizwkslsr/config/auth` with an authorized Management API token, then verify the changed keys. This changes only template subjects/content. The CLI's currently saved account does not own this project.
 
-The PATCH is partial — untouched auth config keys are left alone. Verify with a GET afterwards.
+`{{ .ConfirmationURL }}` stays intact in link templates; `{{ .Token }}` is retained for reauthentication. No password recovery flow is shipped, so no recovery template or reset-password promise is introduced. Account emails do not grant marketing consent.
 
-**Option B — Dashboard.** Supabase Dashboard → project **SportsGameScheduler** → **Authentication → Emails → Templates**.
+The shared shell in `functions/_shared/email-shell.ts` uses warm cream, charcoal, Silbo green and small cyan/pink/amber/green accents. Solid inline styles, system fonts, a text logo alternative, dark-mode enhancements and mobile stacking keep messages usable without images or external font requests. Outlook fixed-width fallbacks are included; real Gmail/Apple Mail/Outlook inbox rendering remains unverified.
 
-1. **Magic Link**
-   - **Subject:** `Sign in to Silbo Sports`
-   - **Message body:** paste the full contents of [`magic-link.html`](./magic-link.html)
-2. **Confirm signup**
-   - **Subject:** `Confirm your email — Silbo Sports`
-   - **Message body:** paste the full contents of [`confirm-signup.html`](./confirm-signup.html)
+Event emails use the same shell through `functions/_shared/email-template.ts`, with explicit local time, direct event CTA, calendar action, broadcaster names/URLs in both HTML and text, and alert-management links. Cancelled events omit countdown and calendar actions. No countdown is presented as a live-updating value.
 
-Click **Save** on each. Send yourself a magic link from silbosports.com to verify delivery + styling.
+Notification dispatch stays paused by default. The worker requires server-only authorization plus `NOTIFICATIONS_ENABLED=true` before materializing or sending; no sending cron is enabled. Browser push uses the branded colour icon and monochrome whistle badge. Clicks navigate an existing same-origin tab to the specific event; cross-origin payload destinations are rejected.
 
-> The app signs users in with `signInWithOtp` (magic link) and Google OAuth. Depending on whether
-> "Confirm email" is enabled, a brand-new email may receive the **Confirm signup** template instead of
-> **Magic Link** — that's why both are provided in the same style. There's no password flow, so the
-> *Reset Password* template is unused; if you later add one, copy the magic-link styling.
-
-## Template variables
-These use Supabase's Go-template tokens, already embedded in the HTML:
-- `{{ .ConfirmationURL }}` — the one-time sign-in / confirm link (button + fallback link).
-- (Available if you want them) `{{ .Token }}` 6-digit code, `{{ .SiteURL }}`, `{{ .Email }}`.
-
-## Keeping brand consistency
-All three templates share the light CRT programme layout used by the site: warm cream reading paper,
-a charcoal broadcast header for the neon lockup, faint scanlines where supported, and small
-cyan/pink/amber/green pixel accents. Palette: charcoal `#171b18`, paper `#f3eddd` /
-card `#fffaf0`, ink `#17352d` (muted `#53675f`, labels `#718178`), action green `#0b6f44`, neon
-`#54ff9f`, cyan `#45c7d4`, pink `#ef6baf`, and amber `#f0b93f`. Type: Space Grotesk body /
-Archivo Black display, with Arial fallbacks for clients that strip web fonts.
-
-The texture and gradients are progressive enhancement. Every structural element, CTA, and contrast
-boundary also has an inline solid-colour fallback for Outlook and clients that remove background images.
+References: [Supabase email templates](https://supabase.com/docs/guides/auth/auth-email-templates), [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp), [Resend SMTP](https://resend.com/docs/send-with-smtp).

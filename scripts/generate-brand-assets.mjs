@@ -254,6 +254,10 @@ export async function writeBrandAssets(targetDir, { rootDir = defaultRoot } = {}
   const logoPath = await readLogoPath(rootDir)
   const text = loadBrandText(rootDir)
   const faviconSvg = createFaviconSvg(logoPath)
+  await fs.mkdir(path.join(targetDir, 'assets/brand'), { recursive: true })
+  await sharp(Buffer.from(faviconSvg)).resize(192, 192).png().toFile(path.join(targetDir, 'assets/brand/notification-icon.png'))
+  const badgeSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"><path transform="translate(5.2 10.8) scale(0.096)" d="${logoPath}" fill="#ffffff" fill-rule="evenodd"/></svg>`
+  await sharp(Buffer.from(badgeSvg)).resize(96, 96).png().toFile(path.join(targetDir, 'assets/brand/notification-badge.png'))
   const emailLockupSvg = createEmailLockupSvgWithText(logoPath, text)
   const ogSvg = createOgCoverSvgWithText(logoPath, text)
 

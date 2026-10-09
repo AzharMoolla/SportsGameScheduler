@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Follow, Preferences, SurfaceMode } from '../lib/store'
+import type { SignInProvider } from '../lib/authProviders'
 
 export type AppState = {
   follows: Follow[]
@@ -17,7 +18,7 @@ export type AppState = {
     user: User | null
     configured: boolean
     signInWithMagicLink: (email: string) => Promise<void>
-    signInWithGoogle: () => Promise<void>
+    signInWithProvider: (provider: SignInProvider) => Promise<void>
     signOut: () => Promise<void>
   }
 }

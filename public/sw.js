@@ -49,9 +49,10 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Silbo Sports alert'
   const options = {
     body: payload.body || 'A schedule you follow has an update.',
-    icon: '/apple-touch-icon.png',
-    badge: '/favicon-32x32.png',
-    data: { url: payload.url || '/settings/alerts' },
+    icon: '/assets/brand/notification-icon.png',
+    badge: '/assets/brand/notification-badge.png',
+    tag: typeof payload.tag === 'string' ? payload.tag : undefined,
+    data: { url: safeNotificationTarget(payload.url) },
   }
 
   event.waitUntil(self.registration.showNotification(title, options))
@@ -59,12 +60,22 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const target = event.notification.data?.url || '/settings/alerts'
+  const target = safeNotificationTarget(event.notification.data?.url)
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-      const existing = windows.find((client) => client.url.includes(self.location.origin))
-      if (existing) return existing.focus()
+      const existing = windows.find((client) => new URL(client.url).origin === self.location.origin)
+      if (existing) return existing.navigate(target).then(client => (client || existing).focus())
       return clients.openWindow(target)
     }),
   )
 })
+
+// A notification must return to this app, including when a malformed payload arrives.
+function safeNotificationTarget(value) {
+  try {
+    const url = new URL(typeof value === 'string' ? value : '/settings/alerts', self.location.origin)
+    if (url.origin === self.location.origin && url.protocol === 'https:') return url.href
+    if (url.origin === self.location.origin && self.location.hostname === '127.0.0.1') return url.href
+  } catch { /* Use the alert settings page. */ }
+  return `${self.location.origin}/settings/alerts`
+}

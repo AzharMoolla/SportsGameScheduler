@@ -92,3 +92,5 @@ See [design review](design-review/REFRESH.md) and [restoration status](RESTORE-S
 ## 2026-10-09 public beta release
 
 Owner authorized publication and Cloudflare deployment. Normal production build and revised seasonal live-data check pass; Olympics are optional while no active programme exists, and baseball's postseason minimum is one actual upcoming fixture rather than 100. Baseball near-term API-Sports hydration is now connected. Saved archives, accessible poster groups and unavailable Google sign-in were corrected. This supersedes the earlier coverage-only release blockers; the complete gate still has unverified account delivery/lifecycle, recovery and owner legal review. See [current release assessment](releases/2026-10-09.md).
+
+2026-10-09 account/message pass: prepared conditional Google/Apple/Microsoft UI and branded auth/event templates; 131 unit tests and 12 desktop/mobile message/sign-in checks pass, plus push navigation and Deno notification checks. Provider activation, real sign-in/merge, SMTP and actual inbox delivery remain BLOCKED pending owner consent/credentials. No fan delivery enabled. See docs/auth-and-messages-2026-10-09.md.

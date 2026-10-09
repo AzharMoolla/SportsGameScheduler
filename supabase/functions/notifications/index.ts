@@ -5,8 +5,10 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { alertCopyFor } from '../_shared/alert-copy.ts'
-import { renderSilboAlertEmail, type WatchOption } from '../_shared/email-template.ts'
+import { formatAlertStart, renderSilboAlertEmail, type WatchOption } from '../_shared/email-template.ts'
 import { encryptWebPushPayload } from '../_shared/web-push.ts'
+import { authorizeMaintenance } from '../_shared/maintenance-auth.ts'
+import { safeEmailUrl } from '../_shared/email-shell.ts'
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -14,8 +16,8 @@ const supabase = createClient(
 )
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? Deno.env.get('RESENDAPI') ?? ''
-const EMAIL_FROM = Deno.env.get('EMAIL_FROM') ?? 'Silbo Sports <reminders@silbosports.app>'
-const APP_URL = normalizeAppUrl(Deno.env.get('APP_URL') ?? 'https://silbosports.app')
+const EMAIL_FROM = Deno.env.get('EMAIL_FROM') ?? ''
+const APP_URL = normalizeAppUrl(Deno.env.get('APP_URL') ?? 'https://silbosports.com')
 const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY') ?? ''
 const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') ?? ''
 const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') ?? `mailto:alerts@${new URL(APP_URL).hostname}`
@@ -74,11 +76,7 @@ function isUnresolvedPlaceholderTitle(title: string | null | undefined): boolean
 }
 
 function normalizeAppUrl(value: string) {
-  try {
-    return new URL(value).toString().replace(/\/$/, '')
-  } catch (_) {
-    return 'https://silbosports.app'
-  }
+  return safeEmailUrl(value).replace(/\/$/, '')
 }
 
 function isEmail(value: string | null | undefined): value is string {
@@ -139,12 +137,13 @@ const TIMEZONE_REGIONS: Record<string, string> = {
   'Pacific/Auckland': 'NZ',
 }
 
-function regionFromProfile(locale: string | null | undefined, timezone: string | null | undefined) {
+function regionFromProfile(locale: string | null | undefined, timezone: string | null | undefined, explicit?: string | null) {
+  if (explicit && /^[A-Z]{2}$/i.test(explicit)) return explicit.toUpperCase()
   const timezoneRegion = timezone ? TIMEZONE_REGIONS[timezone] : undefined
   if (timezoneRegion) return timezoneRegion
   if (timezone?.startsWith('Australia/')) return 'AU'
   const part = locale?.split(/[-_]/)[1]
-  return (part || 'US').toUpperCase()
+  return part && /^[A-Z]{2}$/i.test(part) ? part.toUpperCase() : ''
 }
 
 // Official where-to-watch destinations from the DB (watch_links + watch_providers), scoped to the
@@ -156,15 +155,23 @@ async function fetchWatchOptions(
   sportKey: string | null,
   region: string,
 ): Promise<WatchOption[]> {
+  if (!region) return []
+  const sportAliases = sportKey === 'soccer' ? ['soccer', 'world_cup'] : sportKey ? [sportKey] : []
+  const scopes = [
+    eventId ? `event_id.eq.${eventId}` : '',
+    leagueId ? `and(event_id.is.null,league_id.eq.${leagueId})` : '',
+    sportAliases.length ? `and(event_id.is.null,league_id.is.null,sport_keys.ov.{${sportAliases.join(',')}})` : '',
+  ].filter(Boolean)
+  if (!scopes.length) return []
   const { data } = await supabase
     .from('watch_links')
-    .select('provider_key, label, country_codes, sport_keys, event_id, league_id, link_kind, url, priority, watch_providers(name, direct_url)')
+    .select('provider_key, label, country_codes, sport_keys, event_id, league_id, starts_at, ends_at, link_kind, url, priority, watch_providers(name, direct_url)')
     .eq('is_active', true)
+    .or(scopes.join(','))
     .order('priority', { ascending: true })
     .limit(200)
   if (!data) return []
 
-  const sportAliases = sportKey === 'soccer' ? ['soccer', 'world_cup'] : sportKey ? [sportKey] : []
   const seen = new Set<string>()
   const out: WatchOption[] = []
   for (const row of data as unknown as Array<{
@@ -173,6 +180,8 @@ async function fetchWatchOptions(
     sport_keys: string[] | null
     event_id: string | null
     league_id: string | null
+    starts_at: string | null
+    ends_at: string | null
     url: string | null
     link_kind: string
     watch_providers: { name: string | null; direct_url: string | null } | null
@@ -180,9 +189,11 @@ async function fetchWatchOptions(
   }>) {
     const inScope =
       (row.event_id && row.event_id === eventId) ||
-      (row.league_id && row.league_id === leagueId) ||
+      (!row.event_id && row.league_id && row.league_id === leagueId) ||
       (!row.event_id && !row.league_id && (row.sport_keys ?? []).some((s) => sportAliases.includes(s)))
     if (!inScope) continue
+    if (row.starts_at && new Date(row.starts_at).getTime() > Date.now()) continue
+    if (row.ends_at && new Date(row.ends_at).getTime() < Date.now()) continue
     const countries = row.country_codes ?? []
     if (countries.length && !countries.includes(region)) continue
     const name = row.label ?? row.watch_providers?.name
@@ -200,6 +211,7 @@ async function fetchWatchOptions(
 }
 
 async function sendReminderEmail(delivery: Delivery) {
+  if (!EMAIL_FROM) throw new Error('A verified EMAIL_FROM sender is required')
   if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY/RESENDAPI not configured')
   if (!delivery.user_id || !delivery.event_id) throw new Error('Delivery missing user or event')
 
@@ -212,7 +224,7 @@ async function sendReminderEmail(delivery: Delivery) {
       .single(),
     supabase
       .from('profiles')
-      .select('default_timezone, locale, hour12')
+      .select('default_timezone, locale, hour12, broadcast_region, region_code')
       .eq('user_id', delivery.user_id)
       .maybeSingle(),
   ])
@@ -220,7 +232,7 @@ async function sendReminderEmail(delivery: Delivery) {
   if (!isEmail(email)) throw new SkipDelivery('Missing or invalid recipient email')
   if (!event) throw new SkipDelivery('Missing event for delivery')
 
-  const row = event as EventForAlert
+  const row = event as unknown as EventForAlert
   // Never mail an unresolved slot-code placeholder (e.g. "1E vs 3A/B/C/D/F"). The event is read
   // fresh here, so a resolved fixture always renders correctly; this only guards the never-resolving
   // skeleton rows. Skipped (not failed) so it doesn't churn retries.
@@ -230,8 +242,8 @@ async function sendReminderEmail(delivery: Delivery) {
   if (isStaleForKind(delivery.kind, row)) {
     throw new SkipDelivery(`Event already started or finished (${row.status}, ${row.starts_at})`)
   }
-  const prefs = (profile ?? {}) as { default_timezone: string | null; locale: string | null; hour12: boolean | null }
-  const region = regionFromProfile(prefs.locale, prefs.default_timezone)
+  const prefs = (profile ?? {}) as { default_timezone: string | null; locale: string | null; hour12: boolean | null; broadcast_region: string | null; region_code: string | null }
+  const region = regionFromProfile(prefs.locale, prefs.default_timezone, prefs.broadcast_region || prefs.region_code)
   const manageUrl = `${APP_URL}/settings/alerts`
   const eventUrl = `${APP_URL}/events/${delivery.event_id}`
   const watch = await fetchWatchOptions(delivery.event_id, row.league_id, row.sports?.key ?? null, region)
@@ -308,11 +320,10 @@ async function sendPushNotification(delivery: Delivery) {
   // placeholder/staleness guards as email apply — a stale push is as bad as a stale email.
   let payload: string | null = null
   if (delivery.event_id) {
-    const { data: event } = await supabase
-      .from('events')
-      .select('title, status, starts_at, timezone, venues(name), leagues(name)')
-      .eq('id', delivery.event_id)
-      .maybeSingle()
+    const [{ data: event }, { data: profile }] = await Promise.all([
+      supabase.from('events').select('title, status, starts_at, timezone, venues(name), leagues(name)').eq('id', delivery.event_id).maybeSingle(),
+      supabase.from('profiles').select('default_timezone, hour12').eq('user_id', delivery.user_id).maybeSingle(),
+    ])
     if (event) {
       const row = event as unknown as EventForAlert
       if (isUnresolvedPlaceholderTitle(row.title)) {
@@ -334,8 +345,9 @@ async function sendPushNotification(delivery: Delivery) {
       )
       payload = JSON.stringify({
         title: copy.subject,
-        body: copy.lead,
+        body: [formatAlertStart(row.starts_at, profile?.default_timezone || row.timezone || 'UTC', profile?.hour12)?.full, copy.lead].filter(Boolean).join(' · '),
         url: `${APP_URL}/events/${delivery.event_id}`,
+        tag: `silbo-${delivery.event_id}-${delivery.kind}`,
       })
     }
   }
@@ -442,7 +454,11 @@ async function createVapidJwt(aud: string) {
   return `${input}.${bytesToBase64Url(new Uint8Array(signature))}`
 }
 
-Deno.serve(async () => {
+Deno.serve(async (request) => {
+  const rejected = await authorizeMaintenance(request, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+  if (rejected) return rejected
+  // Design/template deployment never turns delivery on. Enable after opt-in and sender tests.
+  if (Deno.env.get('NOTIFICATIONS_ENABLED') !== 'true') return Response.json({ ok: true, paused: true })
   const { data: materialized, error: materializeError } = await supabase.rpc('materialize_reminders')
   if (materializeError) {
     return Response.json({ ok: false, error: String(materializeError.message) }, { status: 500 })

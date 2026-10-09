@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getSignInProviders } from './authProviders'
 
 // Publishable key only; safe to ship to browsers. RLS enforces what the client can read.
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -7,6 +8,11 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
 let clientPromise: Promise<SupabaseClient | null> | null = null
 
 export const isSupabaseConfigured = Boolean(url && key)
+
+export async function getAvailableSignInProviders() {
+  if (!url || !key) return []
+  return getSignInProviders(url, key)
+}
 
 export function getSupabaseClient() {
   if (!isSupabaseConfigured) return Promise.resolve(null)

@@ -58,4 +58,30 @@ describe('alert copy', () => {
     expect(email.html).toContain('#ef6baf')
   })
 
+  test('escapes event content and rejects unsafe destinations in both formats', () => {
+    const event = { title: '<script>alert(1)</script>', starts_at: 'not-a-date' }
+    const email = renderSilboAlertEmail({ appUrl: 'https://silbosports.com', event, copy: { subject: 'Update', lead: '<img src=x>', body: '' }, manageUrl: 'javascript:alert(1)', eventUrl: 'javascript:alert(1)', watch: [{ name: 'Bad', url: 'data:text/html,x' }], calendarUrl: 'javascript:alert(1)' })
+    expect(email.html).not.toContain('<script>')
+    expect(email.html).not.toContain('javascript:')
+    expect(email.html).not.toContain('data:text/html')
+    expect(email.html).toContain('&lt;script&gt;')
+    expect(email.text).toContain('Time to be confirmed')
+    expect(email.text).toContain('https://silbosports.com/settings/alerts')
+  })
+
+  test('honours the recipient timezone and includes broadcast links in plain text', () => {
+    const event = { title: 'Design fixture', starts_at: '2026-10-12T23:00:00Z', timezone: 'America/Toronto' }
+    const email = renderSilboAlertEmail({ appUrl: 'https://silbosports.com', event, copy: alertCopyFor('reminder', event, ''), manageUrl: 'https://silbosports.com/settings/alerts', displayTimezone: 'Europe/London', hour12: false, watch: [{ name: 'Broadcaster', url: 'https://example.com/watch' }] })
+    expect(email.text).toContain('Tue, Oct 13, 00:00')
+    expect(email.text).toContain('Europe/London')
+    expect(email.text).toContain('https://example.com/watch')
+    expect(email.html).toContain('blackout restrictions')
+  })
+
+  test('cancelled events do not advertise a countdown or add-to-calendar action', () => {
+    const event = { title: 'Cancelled fixture', starts_at: '2099-10-12T23:00:00Z' }
+    const email = renderSilboAlertEmail({ appUrl: 'https://silbosports.com', event, kind: 'cancellation', copy: alertCopyFor('cancellation', event, ''), manageUrl: 'https://silbosports.com/settings/alerts', calendarUrl: 'https://calendar.google.com/calendar/render' })
+    expect(email.html).not.toContain('Starts in about')
+    expect(email.html).not.toContain('Add to calendar')
+  })
 })
