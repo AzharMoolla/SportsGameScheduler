@@ -315,7 +315,8 @@
             }
           ]
         }
-      ]
+      ],
+      "original_provider_starts_at": "2026-10-17T00:00:00.000Z"
     },
     {
       "event_id": "c7a98c00-497c-45f9-9189-95abee101129",
@@ -537,7 +538,8 @@
             }
           ]
         }
-      ]
+      ],
+      "original_provider_starts_at": "2026-10-24T00:00:00.000Z"
     },
     {
       "event_id": "1e3e2a5f-c9ce-4193-ac37-dd4b485cd0f2",
@@ -805,7 +807,8 @@
             }
           ]
         }
-      ]
+      ],
+      "original_provider_starts_at": "2026-10-31T00:00:00.000Z"
     },
     {
       "event_id": "81f5bff4-6901-4847-8abb-eb8042c1cfa8",
@@ -1119,7 +1122,8 @@
             }
           ]
         }
-      ]
+      ],
+      "original_provider_starts_at": "2026-11-07T00:00:00.000Z"
     },
     {
       "event_id": "5368768b-7ace-4d64-b1c7-fd34307af98c",
@@ -1410,7 +1414,8 @@
             }
           ]
         }
-      ]
+      ],
+      "original_provider_starts_at": "2026-11-14T00:00:00.000Z"
     },
     {
       "event_id": "def967bb-d66c-4aa9-86bb-08519704e874",
@@ -1632,7 +1637,8 @@
             }
           ]
         }
-      ]
+      ],
+      "original_provider_starts_at": "2026-11-21T00:00:00.000Z"
     }
   ]
 }

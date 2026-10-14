@@ -19,7 +19,8 @@ begin
       timezone=coalesce(nullif(card->>'timezone',''),timezone),last_checked_at=(snapshot->>'fetched_at')::timestamptz,
       metadata=metadata || jsonb_build_object('cito',jsonb_build_object('id',card->>'source_id','slug',card->>'slug',
         'source_url',card->>'source_url','checked_at',snapshot->>'fetched_at','main_card_starts_at',card->>'main_card_starts_at',
-        'venue',card->>'venue','announced_bouts',jsonb_array_length(card->'bouts'),'running_order_confirmed',false),
+        'venue',card->>'venue','announced_bouts',jsonb_array_length(card->'bouts'),'running_order_confirmed',false,
+        'original_provider_starts_at',card->>'original_provider_starts_at'),
         'schedule_time_kind','main_card','discipline','mma'),
       version=version+case when starts_at is distinct from (card->>'main_card_starts_at')::timestamptz then 1 else 0 end,
       updated_at=case when starts_at is distinct from (card->>'main_card_starts_at')::timestamptz then now() else updated_at end

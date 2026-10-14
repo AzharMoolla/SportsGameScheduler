@@ -1,4 +1,5 @@
 import { authorizeMaintenance } from '../_shared/maintenance-auth.ts'
+import { mergeCombatEnrichment } from '../_shared/combat-enrichment.ts'
 // Paced TheSportsDB hydrator (MP3 data-source work; plan Objective 4).
 //
 // Cron-driven, checkpointed, rate-limit-safe. Each invocation:
@@ -186,11 +187,21 @@ async function loadCtx(target: Target): Promise<Ctx | null> {
 
 async function ensureCompetitors(ctx: Ctx, rows: CompetitorSeed[]) {
   if (!rows.length) return new Map<string, string>()
+  const enrichedNames = new Map<string, string>()
+  if (ctx.sportKey === 'combat_sports') {
+    const ids = rows.map(row => row.id)
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data, error } = await supabase.from('competitors').select('provider_competitor_id,name,theme')
+        .eq('provider_key','thesportsdb').in('provider_competitor_id',ids.slice(i,i+200))
+      if (error) throw error
+      for (const competitor of data ?? []) if (competitor.theme?.cito_fighter_id) enrichedNames.set(competitor.provider_competitor_id,competitor.name)
+    }
+  }
   const payload = rows.map((r) => ({
     sport_id: ctx.sportId,
     league_id: ctx.leagueId,
     kind: r.kind ?? (ctx.sportKey === 'combat_sports' ? 'person' : 'team'),
-    name: r.name,
+    name: enrichedNames.get(r.id) ?? r.name,
     logo_url: r.badge ?? null,
     country: r.country ?? null,
     provider_key: 'thesportsdb',
@@ -269,12 +280,12 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters, deadl
   const pids = raw.map((ev) => ev.idEvent!).filter(Boolean)
   const existing = new Map<
     string,
-    { id: string; title: string; status: string; starts_at: string | null; version: number; payload_hash: string | null }
+    { id: string; title: string; status: string; starts_at: string | null; version: number; payload_hash: string | null; metadata: Record<string, unknown> }
   >()
   for (let i = 0; i < pids.length; i += 200) {
     const { data } = await supabase
       .from('events')
-      .select('id, provider_event_id, title, status, starts_at, version, payload_hash')
+      .select('id, provider_event_id, title, status, starts_at, version, payload_hash, metadata')
       .eq('provider_key', 'thesportsdb')
       .in('provider_event_id', pids.slice(i, i + 200))
     for (const e of data ?? []) existing.set(e.provider_event_id, e)
@@ -372,6 +383,11 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters, deadl
         unchangedIds.push(prior.id)
         continue
       }
+      // An event-title feed must not erase the reviewed bout roster from a second provider.
+      const enrichment = mergeCombatEnrichment(ctx.sportKey === 'combat_sports', prior.metadata ?? {}, metadata, prior.starts_at, iso)
+      const enrichedCard = enrichment.enriched
+      const effectiveStart = enrichment.startsAt
+      const mergedMetadata = enrichment.metadata
       const visibleChange = prior.title !== title || prior.status !== status || prior.starts_at !== iso || prior.payload_hash !== hash
       if (!visibleChange) {
         await supabase
@@ -379,21 +395,23 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters, deadl
           .update({
             payload_hash: hash,
             last_checked_at: checkedAt,
-            metadata,
+            metadata: mergedMetadata,
             venue_id: ev.strVenue ? venueMap.get(ev.strVenue) ?? null : null,
           })
           .eq('id', prior.id)
-        await replaceParticipants(prior.id, homeId, awayId)
-        await replaceTitleInferredBout(prior.id, homeId, awayId)
+        if (!enrichedCard) {
+          await replaceParticipants(prior.id, homeId, awayId)
+          await replaceTitleInferredBout(prior.id, homeId, awayId)
+        }
         continue
       }
-      const timingChange = prior.starts_at !== iso || prior.status !== status
+      const timingChange = prior.starts_at !== effectiveStart || prior.status !== status
       await supabase
         .from('events')
         .update({
           title,
           status,
-          starts_at: iso,
+          starts_at: effectiveStart,
           starts_at_tbd: tbd,
           venue_id: ev.strVenue ? venueMap.get(ev.strVenue) ?? null : null,
           version: prior.version + 1,
@@ -401,7 +419,7 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters, deadl
           last_checked_at: checkedAt,
           payload_hash: hash,
           source_confidence: 'provider',
-          metadata,
+          metadata: mergedMetadata,
         })
         .eq('id', prior.id)
       if (timingChange) {
@@ -410,12 +428,14 @@ async function upsertEvents(ctx: Ctx, raw: RawEvent[], counters: Counters, deadl
           old_status: prior.status,
           new_status: status,
           old_starts_at: prior.starts_at,
-          new_starts_at: iso,
+          new_starts_at: effectiveStart,
           source: 'thesportsdb',
         })
       }
-      await replaceParticipants(prior.id, homeId, awayId)
-      await replaceTitleInferredBout(prior.id, homeId, awayId)
+      if (!enrichedCard) {
+        await replaceParticipants(prior.id, homeId, awayId)
+        await replaceTitleInferredBout(prior.id, homeId, awayId)
+      }
       counters.changed += 1
     }
   }
