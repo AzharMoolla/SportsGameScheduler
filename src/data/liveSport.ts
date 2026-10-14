@@ -342,6 +342,20 @@ export function useMyEvents(
   })
   const eventKey = [...savedEventIds].sort().join(',')
   const queryKey = `${leagueKey}|${competitorKey}|${eventKey}`
+  const [refreshRevision, setRefreshRevision] = useState(0)
+
+  useEffect(() => {
+    if (!leagueKey && !competitorKey && !eventKey) return
+    const refresh = () => {
+      if (document.visibilityState === 'visible') setRefreshRevision(value => value + 1)
+    }
+    const timer = setInterval(refresh, 5 * 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [leagueKey, competitorKey, eventKey])
 
   useEffect(() => {
     let cancelled = false
@@ -402,7 +416,7 @@ export function useMyEvents(
         }
       } catch {
         // Every retry failed — leave the previously loaded schedule on screen rather than wiping
-        // it to empty. The next follow change or revisit re-runs this effect.
+        // it to empty. The next visible refresh or follow change retries this read.
         if (!cancelled) setState(previous => ({ ...previous, forKey: queryKey, error: 'Could not refresh sports events. Reopen this page to retry.' }))
         return
       }
@@ -429,7 +443,7 @@ export function useMyEvents(
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey])
+  }, [queryKey, refreshRevision])
 
   const loading = state.forKey !== queryKey
   return { events: loading ? [] : state.events, loading, configured: state.configured, error: state.error }

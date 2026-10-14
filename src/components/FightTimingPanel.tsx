@@ -14,6 +14,8 @@ export function FightTimingPanel({ event, timezone, locale, hour12 }: { event: E
   const windows=useMemo(()=>estimateFightCard(event.startsAt,event.bouts,discipline,event.fighterHistory),[event,discipline])
   const mainCard=event.bouts.find(b=>b.metadata.card_segment==='main' || b.metadata.is_main_card===true)
   const mainCardWindow=windows.find(w=>w.id===mainCard?.id)
+  const citoCard = event.metadata.cito && typeof event.metadata.cito === 'object' ? event.metadata.cito as Record<string, unknown> : null
+  const mainCardStart = typeof citoCard?.main_card_starts_at === 'string' && Number.isFinite(Date.parse(citoCard.main_card_starts_at)) ? new Date(citoCard.main_card_starts_at) : null
   useEffect(()=>{
     for(const window of windows){
       if(!watched.includes(window.id)) continue
@@ -47,7 +49,8 @@ export function FightTimingPanel({ event, timezone, locale, hour12 }: { event: E
   return <Panel className="space-y-3">
     <PanelHeading title="Fight timing" subtitle="Predicted ring-walk windows in your timezone" />
     <p className="text-xs text-ink/60">Card start and headliner start are different. Estimates use known bout order, rounds, available recent results and confirmed live timing. Walkouts, decisions and broadcast pauses can change these windows.</p>
-    <p className="text-sm font-semibold">Main card: {mainCardWindow?.expected ? `${formatTime(mainCardWindow.earliest!,timezone,options)}–${formatTime(mainCardWindow.latest!,timezone,options)} estimated` : 'segment timing not available yet'}</p>
+    {event.bouts.some(bout => bout.metadata.source === 'cito') && <p className="text-xs text-ink/60">Announced fight-card data: <a className="underline" href="https://citoapi.com" target="_blank" rel="noopener noreferrer">Cito API</a>. Matchups can change; running order and individual start times remain unconfirmed.</p>}
+    <p className="text-sm font-semibold">Main card: {mainCardStart ? `${formatTime(mainCardStart,timezone,options)} scheduled` : mainCardWindow?.expected ? `${formatTime(mainCardWindow.earliest!,timezone,options)}–${formatTime(mainCardWindow.latest!,timezone,options)} estimated` : 'segment timing not available yet'}</p>
     <div className="space-y-2">{windows.map(window=>{
       const bout=event.bouts.find(b=>b.id===window.id)!
       const name=bout.redCorner && bout.blueCorner ? `${bout.redCorner.name} vs ${bout.blueCorner.name}` : bout.redCorner?.name ?? 'Fight'
